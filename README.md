@@ -1,7 +1,3 @@
-Here's a more accurate and customized `README.md` tailored for your **React + Vite + Three.js** project:
-
----
-
 # React + Vite + Three.js Jousting Game
 
 This project is a stylized 3D jousting game built using **React**, **Vite**, and **Three.js**. It features dynamic medieval environments, animated crowds, and physics-based gameplay.
