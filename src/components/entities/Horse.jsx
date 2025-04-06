@@ -1,57 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Clock } from 'three';
-import { useGLTFModel } from '../../hooks/useGLTFModel';
+import { useAnimator } from '../../hooks/useAnimator';
 
-export default function Horse({
-	scene,
-	position = { x: 0, y: 0, z: 0 },
-	isPlayer = false,
-	flipped = false,
-}) {
+export default function Horse({ scene, position = { x: 0, y: 0, z: 0 }, flipped = false }) {
 	const modelPath = '/models/horse/Horse.glb';
-	const clock = useRef(new Clock());
-	const [currentAnimation, setCurrentAnimation] = useState('Idle');
+	// Local storage of the current animation playing
+	const [currentAnimation, setCurrentAnimation] = useState('');
+	// Names of animations embedded in the models .glb
+	const [animationNames, setAnimationNames] = useState([]);
 
-	const { model, animations, playAnimation, updateMixer, mixer } = useGLTFModel(modelPath, scene);
+	// Create the model and animator instance
+	const { model, animations, playAnimation } = useAnimator('Horse', modelPath, scene);
 
-	// Set model position
+	// Init the model pos and anim
 	useEffect(() => {
 		if (!model) return;
+		// Set model position according to the props
 		model.position.set(position.x, position.y, position.z);
 		model.rotation.set(0, flipped ? Math.PI / 2 : -Math.PI / 2, 0);
-	}, [model, position, flipped]);
 
-	// Animation loop
-	useEffect(() => {
-		let frameId;
-		const animate = () => {
-			const delta = clock.current.getDelta();
-			updateMixer(delta);
-			frameId = requestAnimationFrame(animate);
-		};
-		animate();
-		return () => cancelAnimationFrame(frameId);
-	}, [updateMixer]);
-
-	// Auto return to Idle after "End" animations
-	useEffect(() => {
-		if (!mixer || !currentAnimation) return;
-
-		const onFinished = () => {
-			if (currentAnimation.includes('End')) {
-				playAnimation('Idle');
-				setCurrentAnimation('Idle');
-			}
-		};
-
-		mixer.addEventListener('finished', onFinished);
-		return () => {
-			mixer.removeEventListener('finished', onFinished);
-		};
-	}, [mixer, currentAnimation]);
-
-	const animationNames = ['Idle', 'Walk', 'Run', 'Attack', 'Die'];
+		// Set animation names from the Array<AnimationClip> and play the Run animation by default
+		setAnimationNames(animations.map((anim) => anim.name));
+		playAnimation('Run');
+	}, [model]);
 
 	const handlePlay = (name) => {
 		playAnimation(name);
