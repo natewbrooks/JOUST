@@ -32,7 +32,7 @@ export const initGraphics = (scene, cameraRef) => {
 	const renderPass = new RenderPass(scene, cameraRef.current);
 	const pixelPass = new ShaderPass(PixelArtShader);
 	pixelPass.uniforms['resolution'].value.set(window.innerWidth, window.innerHeight);
-	pixelPass.uniforms['pixelSize'].value = 4;
+	pixelPass.uniforms['pixelSize'].value = 3; // debating between 3/4
 
 	composer.addPass(renderPass);
 	composer.addPass(pixelPass);

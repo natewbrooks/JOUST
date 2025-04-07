@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { AnimationMixer } from 'three';
 import { Clock } from 'three';
+import * as THREE from 'three';
 
 export function useAnimator(name, path, scene, onLoaded) {
 	const [animations, setAnimations] = useState([]);
@@ -10,6 +11,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 	const [mixer, setMixer] = useState(null);
 
 	const loader = useRef(new GLTFLoader()).current;
+	const textureLoader = useRef(new THREE.TextureLoader()).current;
 	const clock = useRef(new Clock()).current;
 
 	const isLoadedRef = useRef(false); // only allow for one load
@@ -39,6 +41,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 
 				// GLTF Object
 				console.log('OBJECT CREATED: ' + gltf.asset);
+				console.log('type: ' + loadedModel.type);
 
 				if (onLoaded) onLoaded(loadedModel, gltf.animations);
 			},
@@ -56,6 +59,27 @@ export function useAnimator(name, path, scene, onLoaded) {
 			}
 		};
 	}, []);
+
+	// Set the material texture of the object
+	const setMaterial = (path, name) => {
+		// Local path in /public folders
+		const texture = textureLoader.load(path);
+		texture.name = name;
+
+		// Set options
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.flipY = false;
+		texture.userData = { mimeType: 'image/png' };
+
+		model.traverse((child) => {
+			if (child instanceof THREE.Mesh) {
+				child.material.map = texture;
+				console.log('Material changed to: ' + texture.name);
+			}
+		});
+	};
 
 	// Handle model animation
 	const playAnimation = (name) => {
@@ -99,5 +123,6 @@ export function useAnimator(name, path, scene, onLoaded) {
 		model: model,
 		animations: animations,
 		playAnimation,
+		setMaterial,
 	};
 }

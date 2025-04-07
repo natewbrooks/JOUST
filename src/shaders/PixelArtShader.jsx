@@ -1,10 +1,11 @@
+// PixelArtShader.js
 import * as THREE from 'three';
 
 export const PixelArtShader = {
 	uniforms: {
 		tDiffuse: { value: null },
 		resolution: { value: new THREE.Vector2(1.0, 1.0) },
-		pixelSize: { value: 3.0 },
+		pixelSize: { value: 4.0 },
 	},
 	vertexShader: `
 		varying vec2 vUv;
@@ -18,11 +19,15 @@ export const PixelArtShader = {
 		uniform vec2 resolution;
 		uniform float pixelSize;
 		varying vec2 vUv;
+
 		void main() {
 			vec2 fragCoord = vUv * resolution;
-			vec2 pixelatedCoord = floor(fragCoord / pixelSize) * pixelSize;
+			vec2 pixelatedCoord = (floor(fragCoord / pixelSize) + 0.5) * pixelSize;
 			vec2 uv = pixelatedCoord / resolution;
-			gl_FragColor = texture2D(tDiffuse, uv);
+
+			vec4 color = texture2D(tDiffuse, uv);
+			color.rgb = pow(color.rgb, vec3(1.0 / 2.2)); // Linear to sRGB correction
+			gl_FragColor = color;
 		}
 	`,
 };
