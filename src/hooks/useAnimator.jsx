@@ -7,6 +7,7 @@ import * as THREE from 'three';
 export function useAnimator(name, path, scene, onLoaded) {
 	const [animations, setAnimations] = useState([]);
 	const [modelName, setModelName] = useState(name);
+	const [loadedTexture, setLoadedTexture] = useState(null);
 	const [model, setModel] = useState(null);
 	const [mixer, setMixer] = useState(null);
 
@@ -60,7 +61,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 		};
 	}, []);
 
-	// Set the material texture of the object
+	// Load and set the material texture of the object
 	const setMaterial = (path, name) => {
 		// Local path in /public folders
 		const texture = textureLoader.load(path);
@@ -72,6 +73,8 @@ export function useAnimator(name, path, scene, onLoaded) {
 		texture.wrapT = THREE.RepeatWrapping;
 		texture.flipY = false;
 		texture.userData = { mimeType: 'image/png' };
+
+		setLoadedTexture(texture);
 
 		model.traverse((child) => {
 			if (child instanceof THREE.Mesh) {
@@ -124,5 +127,6 @@ export function useAnimator(name, path, scene, onLoaded) {
 		animations: animations,
 		playAnimation,
 		setMaterial,
+		material: loadedTexture,
 	};
 }

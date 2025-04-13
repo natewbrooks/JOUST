@@ -126,13 +126,13 @@ function App() {
 			<Horse
 				scene={sceneRef.current}
 				position={{ x: -10, y: 0, z: -1 }}
-				isPlayer={true}
 				flipped={true}
+				isPlayer={false}
 			/>
 			<Horse
 				scene={sceneRef.current}
 				position={{ x: 10, y: 0, z: 1 }}
-				isPlayer={false}
+				isPlayer={true}
 			/>
 
 			<div className='banner border-b-8 border-darkcream'>

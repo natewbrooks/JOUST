@@ -10,10 +10,10 @@ Create a 3D jousting game in the browser with pixelated visuals, side-scrolling 
 
 ### Week 1 – Initial Setup and Visuals
 
-- [ ] Research pixelation shaders in Three.js
+- [x] Research pixelation shaders in Three.js
 - [ ] Plan dynamic camera (side view to front cinematic view)
 - [ ] Design low-poly arena and layout of spectators
-- [ ] Model base knight and horse in Blender
+- [x] Model base knight and horse in Blender
 
 ### Week 2 – Movement and Side View Mechanics
 
