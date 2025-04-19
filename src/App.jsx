@@ -3,15 +3,20 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import ButtonPromptUI from './components/ui/ButtonPromptUI';
 import Horse from './components/entities/Horse.jsx';
-import { toggleHitView, toggleSideView, transitionToCamera } from './utils/cameraTransitions.jsx';
+import { swapCameraView, setSideViewCamera, setPovCamera } from './utils/cameraTransitions.jsx';
 
 import { initGraphics } from './utils/initGraphics.jsx';
+import Player from './components/entities/Player.jsx';
+import Opponent from './components/entities/Opponent.jsx';
 
 function App() {
 	const sceneRef = useRef(new THREE.Scene());
 	const mainCameraRef = useRef();
-	const orthoCameraRef = useRef();
-	const perspectiveCameraRef = useRef();
+	const sideViewCameraRef = useRef(); // ORTHOGRAPHIC CAMERA
+	const playerPovCameraRef = useRef(); // PERSPECTIVE CAMERA
+
+	const playerRef = useRef(); // PLAYER REF
+	const opponentRef = useRef(); // Opponent REF
 
 	const [clicks, setClicks] = useState(0);
 	const [mph, setMph] = useState(0);
@@ -50,7 +55,7 @@ function App() {
 
 	useEffect(() => {
 		const quickMph = gsap.quickTo(mphState.current, 'val', {
-			duration: 0.2,
+			duration: 0.5,
 			ease: 'power2.out',
 			onUpdate: () => {
 				setMph(mphState.current.val);
@@ -90,7 +95,7 @@ function App() {
 		return () => cancelAnimationFrame(frame);
 	}, []);
 
-	// Init
+	// Init cameras and graphics
 	useEffect(() => {
 		const scene = sceneRef.current;
 
@@ -110,11 +115,10 @@ function App() {
 			window.innerWidth / window.innerHeight
 		);
 
-		toggleSideView(orthoCamera);
-		toggleHitView(perspectiveCamera);
+		setSideViewCamera(orthoCamera);
 
-		orthoCameraRef.current = orthoCamera;
-		perspectiveCameraRef.current = perspectiveCamera;
+		sideViewCameraRef.current = orthoCamera;
+		playerPovCameraRef.current = perspectiveCamera;
 		mainCameraRef.current = orthoCamera;
 
 		const { dispose } = initGraphics(scene, mainCameraRef);
@@ -123,46 +127,33 @@ function App() {
 
 	return (
 		<div>
-			<Horse
+			<Opponent
 				scene={sceneRef.current}
-				position={{ x: -10, y: 0, z: -1 }}
+				opponentRef={opponentRef}
+				position={{ x: -10, y: 2.5, z: -1 }}
+				team={'red'}
 				flipped={true}
-				isPlayer={false}
 			/>
-			<Horse
+			<Player
 				scene={sceneRef.current}
-				position={{ x: 10, y: 0, z: 1 }}
-				isPlayer={true}
+				playerRef={playerRef}
+				opponentRef={opponentRef}
+				povCameraRef={playerPovCameraRef}
+				position={{ x: 10 - mph, y: 2.5, z: 1 }}
+				team={'blue'}
+				flipped={false}
 			/>
 
 			<div className='banner border-b-8 border-darkcream'>
 				<div className='flex w-full justify-center space-x-8 py-2 bg-cream'>
 					<button
 						onClick={() => {
-							// Create a temp OrthographicCamera that matches the current camera's transform
-							const zoom = 150;
-							const newCam = new THREE.OrthographicCamera(
-								-window.innerWidth / zoom,
-								window.innerWidth / zoom,
-								window.innerHeight / zoom,
-								-window.innerHeight / zoom,
-								0.1,
-								1000
-							);
-
-							// Match position and rotation from current main camera
-							newCam.position.copy(mainCameraRef.current.position);
-							newCam.rotation.copy(mainCameraRef.current.rotation);
-							newCam.position.z = 10;
-
-							// Make it the current camera for rendering and animation
-							mainCameraRef.current = newCam;
-							sceneRef.current.add(mainCameraRef.current);
-
+							// Transition to side view camera
 							const from = mainCameraRef.current;
-							const to = orthoCameraRef.current;
+							const to = sideViewCameraRef.current;
+							setSideViewCamera(to);
 
-							transitionToCamera(from, to, () => {
+							swapCameraView(from, to, {}, () => {
 								mainCameraRef.current = to;
 							});
 						}}
@@ -172,35 +163,17 @@ function App() {
 					<div className='font-medieval text-black font-bold text-5xl'>JOUST.</div>
 					<button
 						onClick={() => {
-							// Create a new PerspectiveCamera
-							const newCam = new THREE.PerspectiveCamera(
-								100,
-								window.innerWidth / window.innerHeight,
-								0.1,
-								1000
-							);
-
-							// Match the current position/rotation from orthoCamera
-							const currPos = orthoCameraRef.current.position;
-							const currRot = orthoCameraRef.current.rotation;
-
-							newCam.position.copy(currPos);
-							newCam.rotation.copy(currRot);
-
-							// Update ref to new camera
-							mainCameraRef.current = newCam;
-							sceneRef.current.add(mainCameraRef.current);
-
-							// Transition to the target camera (visually)
+							// Transition to player pov camera
 							const from = mainCameraRef.current;
-							const to = perspectiveCameraRef.current;
+							const to = playerPovCameraRef.current;
+							setPovCamera(to, playerRef.current.position, opponentRef.current.position);
 
-							transitionToCamera(from, to, () => {
+							swapCameraView(from, to, {}, () => {
 								mainCameraRef.current = to;
 							});
 						}}
 						className='bg-red px-2 font-medieval text-bkg'>
-						Trigger Hit View
+						Trigger Player View
 					</button>
 				</div>
 			</div>

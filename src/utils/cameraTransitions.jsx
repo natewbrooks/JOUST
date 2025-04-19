@@ -1,16 +1,27 @@
 import gsap from 'gsap';
+import * as THREE from 'three';
 
 /**
- * Smoothly moves one camera to another camera's transform
- * @param {THREE.Camera} fromCamera - The current active camera
- * @param {THREE.Camera} toCamera - The target camera (final position)
- * @param {function} onComplete - Optional callback
+ * Smoothly transitions the main camera to the position and rotation of a target camera.
+ *
+ * @param {THREE.Camera} mainCamera - The camera being animated (active camera).
+ * @param {THREE.Camera} targetCamera - The destination camera to match.
+ * @param {Object} options - GSAP animation options.
+ * @param {number} [options.duration=1.5] - Duration of the transition.
+ * @param {string} [options.ease='power2.inOut'] - Easing function.
+ * @param {Function} [onComplete] - Optional callback after transition.
  */
-export const transitionToCamera = (
+export const swapCameraView = (
 	mainCamera,
 	targetCamera,
-	{ duration = 1.5, ease = 'power2.inOut' } = {}
+	{ duration = 1.5, ease = 'power2.inOut' } = {},
+	onComplete
 ) => {
+	if (!mainCamera || !targetCamera) return;
+
+	console.log('MAIN CAMERA START POS:', mainCamera.position.toArray());
+	console.log('TARGET CAMERA POS:', targetCamera.position.toArray());
+
 	gsap.to(mainCamera.position, {
 		x: targetCamera.position.x,
 		y: targetCamera.position.y,
@@ -25,53 +36,49 @@ export const transitionToCamera = (
 		z: targetCamera.rotation.z,
 		duration,
 		ease,
+		onComplete,
 	});
 };
 
 /**
- * Animates the camera to a "hit" position and then rotates 90° from side view,
- * moving in closer toward the model
+ * Sets the camera to the target (players) position and looks at object (opponent)
  * @param {THREE.Camera} camera - The camera to move
  */
-export const toggleHitView = (camera, lookAt) => {
+export const setPovCamera = (camera, targetPosition, lookAtPosition) => {
 	if (!camera) return;
 
-	const targetPosition = { x: 10.5, y: 2.5, z: 1.3 };
-	const targetRotation = { x: 0, y: Math.PI / 2, z: 0 };
-	gsap.to(camera.rotation, {
-		...targetRotation,
-		duration: 1.5,
-		ease: 'power2.inOut',
-	});
+	const offset = new THREE.Vector3(0, 0, 0);
+	camera.lookAt(lookAtPosition);
 
-	gsap.to(camera.position, {
-		...targetPosition,
-		duration: 1,
-		ease: 'power2.inOut',
-	});
+	const tp = { x: 0, y: 5, z: 10 };
+	const tr = { x: 0, y: 0, z: 0 }; // ← fixed: z: 10 would twist view oddly
+
+	camera.position.set(tp.x, tp.y, tp.z);
+	camera.rotation.set(tr.x, tr.y, tr.z);
+
+	// gsap.to(camera.position, {
+	// 	...targetPosition,
+	// 	duration: 1,
+	// 	ease: 'power2.inOut',
+	// 	onUpdate: () => {
+	// 		camera.lookAt(lookAtPosition);
+	// 	},
+	// 	onComplete: () => {
+	// 		camera.lookAt(lookAtPosition); // ensure it's final
+	// 	},
+	// });
 };
 
 /**
- * Animates the camera to a "side" position and then rotates to face the mesh
+ * Sets the camera to a "side" position
  * @param {THREE.Camera} camera - The camera to move
  */
-export const toggleSideView = (camera) => {
+export const setSideViewCamera = (camera) => {
 	if (!camera) return;
 
-	const targetPosition = { x: 0, y: 6, z: 10 };
-	const targetRotation = { x: -0.35, y: 0, z: 0 }; // ← look toward -X (side view)
+	const targetPosition = { x: 0, y: 3, z: 10 };
+	const targetRotation = { x: 0, y: 0, z: 0 }; // ← fixed: z: 10 would twist view oddly
 
-	// Animate position
-	gsap.to(camera.position, {
-		...targetPosition,
-		duration: 3,
-		ease: 'power2.inOut',
-	});
-
-	// Animate rotation
-	gsap.to(camera.rotation, {
-		...targetRotation,
-		duration: 2,
-		ease: 'power2.inOut',
-	});
+	camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
+	camera.rotation.set(targetRotation.x, targetRotation.y, targetRotation.z);
 };

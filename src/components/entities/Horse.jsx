@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useAnimator } from '../../hooks/useAnimator';
 
-export default function Horse({
-	scene,
-	position = { x: 0, y: 0, z: 0 },
-	isPlayer,
-	flipped = false,
-}) {
+export default function Horse({ scene, position, isPlayer, flipped = false }) {
 	const modelPath = '/models/horse/Horse.glb';
 	const materialPath = '/models/horse/Materials/';
 	const materials = {
@@ -59,6 +54,12 @@ export default function Horse({
 		setAnimationNames(animations.map((anim) => anim.name));
 		playAnimation('Run');
 	}, [model]);
+
+	useEffect(() => {
+		if (!model) return;
+		// Set model position according to the props
+		model.position.set(position.x, position.y, position.z);
+	}, [position]);
 
 	const handlePlay = (name) => {
 		playAnimation(name);
