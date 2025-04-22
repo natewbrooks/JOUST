@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
+
 import ButtonPromptUI from './components/ui/ButtonPromptUI';
 import Horse from './components/entities/Horse.jsx';
 import { swapCameraView, setSideViewCamera, setPovCamera } from './utils/cameraTransitions.jsx';
@@ -8,6 +9,8 @@ import { swapCameraView, setSideViewCamera, setPovCamera } from './utils/cameraT
 import { initGraphics } from './utils/initGraphics.jsx';
 import Player from './components/entities/Player.jsx';
 import Opponent from './components/entities/Opponent.jsx';
+
+import GameState from './game-state.js';
 
 function App() {
 	const sceneRef = useRef(new THREE.Scene());
@@ -20,82 +23,26 @@ function App() {
 	const playerRef = useRef(); // PLAYER REF
 	const opponentRef = useRef(); // Opponent REF
 
-	const [clicks, setClicks] = useState(0);
-	const [mph, setMph] = useState(0);
-	const [wKeyActive, setWKeyActive] = useState(false);
-	const [wKeyPressedVisual, setWKeyPressedVisual] = useState(false);
+	const [opponentMPH, setOpponentMPH] = useState(0);
+	const [playerMPH, setPlayerMPH] = useState(0);
 
-	const pressTimestamps = useRef([]);
-	const mphState = useRef({ val: 0 });
+	// Animation frame reference
+	const animationFrameRef = useRef(null);
 
-	useEffect(() => {
-		const handleKeyDown = (e) => {
-			const key = e.key.toLowerCase();
-			if (key === 'w' && !e.repeat) {
-				if (!wKeyActive) setWKeyActive(true);
-				setWKeyPressedVisual(true);
-				setClicks((prev) => prev + 1);
+	// Starting positions
+	const playerStartX = -18;
+	const opponentStartX = 18;
+	const moveSpeed = 7; // 20mph constant speed
 
-				const now = performance.now();
-				pressTimestamps.current.push(now);
-			}
-		};
+	// Initialize positions
+	const playerPosRef = useRef({ x: playerStartX, y: 2.5, z: -0.5 });
+	const opponentPosRef = useRef({ x: opponentStartX, y: 2.5, z: 1 });
 
-		const handleKeyUp = (e) => {
-			if (e.key.toLowerCase() === 'a') {
-				setWKeyPressedVisual(false);
-			}
-		};
+	const [playerPos, setPlayerPos] = useState(playerPosRef.current);
+	const [opponentPos, setOpponentPos] = useState(opponentPosRef.current);
 
-		window.addEventListener('keydown', handleKeyDown);
-		window.addEventListener('keyup', handleKeyUp);
-		return () => {
-			window.removeEventListener('keydown', handleKeyDown);
-			window.removeEventListener('keyup', handleKeyUp);
-		};
-	}, [wKeyActive]);
-
-	useEffect(() => {
-		const quickMph = gsap.quickTo(mphState.current, 'val', {
-			duration: 0.5,
-			ease: 'power2.out',
-			onUpdate: () => {
-				setMph(mphState.current.val);
-			},
-		});
-
-		let lastClickTime = performance.now();
-		let frame;
-
-		const update = () => {
-			const now = performance.now();
-
-			pressTimestamps.current = pressTimestamps.current.filter((t) => now - t < 8000);
-			const count = pressTimestamps.current.length;
-
-			if (count > 0) {
-				lastClickTime = now;
-			}
-
-			const normalized = Math.min(1, count / 60);
-			const current = mphState.current.val;
-
-			let target = 70 * normalized;
-
-			const idleTime = (now - lastClickTime) / 1000;
-			if (idleTime > 0.1) {
-				const decayFactor = 1.2;
-				const decayAmount = Math.pow(idleTime, 2) * decayFactor;
-				target = Math.max(0, current - decayAmount);
-			}
-
-			quickMph(target);
-			frame = requestAnimationFrame(update);
-		};
-
-		update();
-		return () => cancelAnimationFrame(frame);
-	}, []);
+	const horsesPassedRef = useRef(false);
+	const hasAnimatedRef = useRef(false); // Track if the stop animation already ran
 
 	// Init cameras and graphics
 	useEffect(() => {
@@ -117,7 +64,8 @@ function App() {
 			window.innerWidth / window.innerHeight
 		);
 
-		setSideViewCamera(orthoCamera);
+		// For a wider view to frame horses:
+		setSideViewCamera(orthoCamera, { distance: 20, height: 1.5, zoom: 75 });
 
 		sideViewCameraRef.current = orthoCamera;
 		playerPovCameraRef.current = perspectiveCamera;
@@ -127,30 +75,121 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		setPovCamera(
-			playerPovCameraRef.current,
-			playerRef.current.position,
-			opponentRef.current.position,
-			povCameraInitRef.current
-		);
-	}, [playerRef.current, opponentRef.current, mph]);
+		GameState.startRound();
+	}, []);
+
+	// Animation loop for constant speed
+	useEffect(() => {
+		let lastTime = null;
+
+		const animate = (timestamp) => {
+			if (!lastTime) lastTime = timestamp;
+			const deltaTime = (timestamp - lastTime) / 1000; // Convert to seconds
+			lastTime = timestamp;
+
+			const player = playerPosRef.current;
+			const opponent = opponentPosRef.current;
+
+			horsesPassedRef.current = player.x >= opponent.x;
+
+			if (horsesPassedRef.current && !hasAnimatedRef.current) {
+				hasAnimatedRef.current = true;
+
+				// Animate player x to opponentStartX
+				gsap.to(player, {
+					x: opponentStartX,
+					duration: 12,
+					ease: 'power2.out',
+				});
+
+				// Animate opponent x to playerStartX
+				gsap.to(opponent, {
+					x: playerStartX,
+					duration: 12,
+					ease: 'power2.out',
+				});
+
+				// Animate player MPH to 0
+				gsap.to(
+					{},
+					{
+						duration: 10,
+						ease: 'power2.out',
+						onUpdate: function () {
+							setPlayerMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
+						},
+					}
+				);
+
+				// Animate opponent MPH to 0
+				gsap.to(
+					{},
+					{
+						duration: 10,
+						ease: 'power2.out',
+						onUpdate: function () {
+							setOpponentMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
+						},
+					}
+				);
+			} else {
+				// Normal movement before pass
+				if (GameState.can_move) {
+					playerPosRef.current.x += moveSpeed * deltaTime;
+					opponentPosRef.current.x -= moveSpeed * deltaTime;
+
+					setPlayerMPH(moveSpeed);
+					setOpponentMPH(moveSpeed);
+				}
+			}
+
+			// Sync with React state (for UI + rendering children)
+			setPlayerPos({ ...player });
+			setOpponentPos({ ...opponent });
+
+			animationFrameRef.current = requestAnimationFrame(animate);
+		};
+
+		// Start the animation loop
+		animationFrameRef.current = requestAnimationFrame(animate);
+
+		// Cleanup function
+		return () => {
+			if (animationFrameRef.current) {
+				cancelAnimationFrame(animationFrameRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (playerRef.current && opponentRef.current) {
+			setPovCamera(
+				playerPovCameraRef.current,
+				playerRef.current.position,
+				opponentRef.current.position,
+				povCameraInitRef.current,
+				playerRef.current,
+				horsesPassedRef.current
+			);
+		}
+	}, [playerPos, opponentPos]);
 
 	return (
 		<div>
 			<Opponent
 				scene={sceneRef.current}
 				opponentRef={opponentRef}
-				position={{ x: -10, y: 2.5, z: -0.5 }}
+				position={opponentPos}
 				team={'red'}
-				flipped={true}
+				flipped={false}
 			/>
 			<Player
 				scene={sceneRef.current}
 				playerRef={playerRef}
 				cameraRef={playerPovCameraRef}
-				position={{ x: 10 - mph, y: 2.5, z: 1 }}
+				position={playerPos}
 				team={'blue'}
-				flipped={false}
+				flipped={true}
 			/>
 
 			<div className='banner border-b-8 border-darkcream'>
@@ -159,16 +198,21 @@ function App() {
 				</div>
 			</div>
 
-			<div className='footer flex flex-col space-y-4'>
-				<div className='flex w-full justify-center space-x-2'>
-					<ButtonPromptUI
-						letter='W'
-						isPressed={wKeyPressedVisual}
-						isActive={wKeyActive}
-					/>
+			<div className='center-screen'>
+				<div className='w-full flex justify-center items-center'>
+					{GameState.round_countdown_timer > 0 ? (
+						<div className='text-black bg-cream w-[100px] text-center pt-2 rounded-full h-fit font-medieval text-8xl'>
+							{GameState.round_countdown_timer}
+						</div>
+					) : (
+						''
+					)}
 				</div>
+			</div>
+
+			<div className='footer flex flex-col space-y-4'>
 				<div className='flex font-medieval justify-center w-full text-cream'>
-					{mph.toFixed(1)} MPH | {clicks} Click{clicks === 1 ? '' : 's'}
+					Player: {playerMPH.toFixed(1)} MPH | Opponent: {opponentMPH.toFixed(1)} MPH
 				</div>
 			</div>
 		</div>

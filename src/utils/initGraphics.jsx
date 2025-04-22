@@ -52,7 +52,8 @@ export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 
 		// Update bottom camera frustum
 		if (bottomCameraRef.current && bottomCameraRef.current.isOrthographicCamera) {
-			const zoom = 150;
+			// Use stored zoom factor instead of hardcoded value
+			const zoom = bottomCameraRef.current.userData.zoomFactor || 150;
 			bottomCameraRef.current.left = -w / zoom;
 			bottomCameraRef.current.right = w / zoom;
 			bottomCameraRef.current.top = bottomHeight / zoom;
@@ -60,7 +61,7 @@ export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 			bottomCameraRef.current.updateProjectionMatrix();
 		}
 
-		// Resize post-processors and shaders
+		// Rest of the handleResize function remains the same
 		topComposer.setSize(w, topHeight);
 		topPixelPass.uniforms['resolution'].value.set(w, topHeight);
 		topPixelPass.uniforms['pixelSize'].value = 3.0;
