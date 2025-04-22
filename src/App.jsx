@@ -15,13 +15,15 @@ function App() {
 	const sideViewCameraRef = useRef(); // ORTHOGRAPHIC CAMERA
 	const playerPovCameraRef = useRef(); // PERSPECTIVE CAMERA
 
+	const povCameraInitRef = useRef(false); // IS PLAYER POV CAMERA INITIALIZED
+
 	const playerRef = useRef(); // PLAYER REF
 	const opponentRef = useRef(); // Opponent REF
 
 	const [clicks, setClicks] = useState(0);
 	const [mph, setMph] = useState(0);
-	const [aKeyActive, setAKeyActive] = useState(false);
-	const [aKeyPressedVisual, setAKeyPressedVisual] = useState(false);
+	const [wKeyActive, setWKeyActive] = useState(false);
+	const [wKeyPressedVisual, setWKeyPressedVisual] = useState(false);
 
 	const pressTimestamps = useRef([]);
 	const mphState = useRef({ val: 0 });
@@ -29,9 +31,9 @@ function App() {
 	useEffect(() => {
 		const handleKeyDown = (e) => {
 			const key = e.key.toLowerCase();
-			if (key === 'a' && !e.repeat) {
-				if (!aKeyActive) setAKeyActive(true);
-				setAKeyPressedVisual(true);
+			if (key === 'w' && !e.repeat) {
+				if (!wKeyActive) setWKeyActive(true);
+				setWKeyPressedVisual(true);
 				setClicks((prev) => prev + 1);
 
 				const now = performance.now();
@@ -41,7 +43,7 @@ function App() {
 
 		const handleKeyUp = (e) => {
 			if (e.key.toLowerCase() === 'a') {
-				setAKeyPressedVisual(false);
+				setWKeyPressedVisual(false);
 			}
 		};
 
@@ -51,7 +53,7 @@ function App() {
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('keyup', handleKeyUp);
 		};
-	}, [aKeyActive]);
+	}, [wKeyActive]);
 
 	useEffect(() => {
 		const quickMph = gsap.quickTo(mphState.current, 'val', {
@@ -119,26 +121,33 @@ function App() {
 
 		sideViewCameraRef.current = orthoCamera;
 		playerPovCameraRef.current = perspectiveCamera;
-		mainCameraRef.current = orthoCamera;
 
-		const { dispose } = initGraphics(scene, mainCameraRef);
+		const { dispose } = initGraphics(scene, playerPovCameraRef, sideViewCameraRef);
 		return () => dispose();
 	}, []);
+
+	useEffect(() => {
+		setPovCamera(
+			playerPovCameraRef.current,
+			playerRef.current.position,
+			opponentRef.current.position,
+			povCameraInitRef.current
+		);
+	}, [playerRef.current, opponentRef.current, mph]);
 
 	return (
 		<div>
 			<Opponent
 				scene={sceneRef.current}
 				opponentRef={opponentRef}
-				position={{ x: -10, y: 2.5, z: -1 }}
+				position={{ x: -10, y: 2.5, z: -0.5 }}
 				team={'red'}
 				flipped={true}
 			/>
 			<Player
 				scene={sceneRef.current}
 				playerRef={playerRef}
-				opponentRef={opponentRef}
-				povCameraRef={playerPovCameraRef}
+				cameraRef={playerPovCameraRef}
 				position={{ x: 10 - mph, y: 2.5, z: 1 }}
 				team={'blue'}
 				flipped={false}
@@ -146,44 +155,16 @@ function App() {
 
 			<div className='banner border-b-8 border-darkcream'>
 				<div className='flex w-full justify-center space-x-8 py-2 bg-cream'>
-					<button
-						onClick={() => {
-							// Transition to side view camera
-							const from = mainCameraRef.current;
-							const to = sideViewCameraRef.current;
-							setSideViewCamera(to);
-
-							swapCameraView(from, to, {}, () => {
-								mainCameraRef.current = to;
-							});
-						}}
-						className='bg-blue-200 px-2 font-medieval text-bkg'>
-						Trigger Side View
-					</button>
 					<div className='font-medieval text-black font-bold text-5xl'>JOUST.</div>
-					<button
-						onClick={() => {
-							// Transition to player pov camera
-							const from = mainCameraRef.current;
-							const to = playerPovCameraRef.current;
-							setPovCamera(to, playerRef.current.position, opponentRef.current.position);
-
-							swapCameraView(from, to, {}, () => {
-								mainCameraRef.current = to;
-							});
-						}}
-						className='bg-red px-2 font-medieval text-bkg'>
-						Trigger Player View
-					</button>
 				</div>
 			</div>
 
 			<div className='footer flex flex-col space-y-4'>
 				<div className='flex w-full justify-center space-x-2'>
 					<ButtonPromptUI
-						letter='A'
-						isPressed={aKeyPressedVisual}
-						isActive={aKeyActive}
+						letter='W'
+						isPressed={wKeyPressedVisual}
+						isActive={wKeyActive}
 					/>
 				</div>
 				<div className='flex font-medieval justify-center w-full text-cream'>

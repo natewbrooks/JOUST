@@ -1,14 +1,10 @@
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, ShaderPass } from 'three/examples/jsm/Addons.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { PixelArtShader } from '../shaders/PixelArtShader.jsx';
 
-/**
- * Initializes lighting, post-processing, and rendering
- * @param {THREE.Scene} scene
- * @param {THREE.Camera} cameraRef.current
- * @returns {{ dispose: () => void }}
- */
-export const initGraphics = (scene, cameraRef) => {
+export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 	const ambient = new THREE.AmbientLight(0xffffff, 0.6);
 	scene.add(ambient);
 
@@ -19,49 +15,105 @@ export const initGraphics = (scene, cameraRef) => {
 	const renderer = new THREE.WebGLRenderer({ antialias: false });
 	renderer.setPixelRatio(1);
 	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setScissorTest(true);
 	document.body.appendChild(renderer.domElement);
 
-	// Add cameraRef.current to the scene to ensure it has a parent
-	if (cameraRef.current && scene && cameraRef.current instanceof THREE.Camera) {
-		if (!cameraRef.current.parent) {
-			scene.add(cameraRef.current);
-		}
-	}
+	// === Create EffectComposers per camera ===
+	const topComposer = new EffectComposer(renderer);
+	const bottomComposer = new EffectComposer(renderer);
 
-	const composer = new EffectComposer(renderer);
-	const renderPass = new RenderPass(scene, cameraRef.current);
-	const pixelPass = new ShaderPass(PixelArtShader);
-	pixelPass.uniforms['resolution'].value.set(window.innerWidth, window.innerHeight);
-	pixelPass.uniforms['pixelSize'].value = 3; // debating between 3/4
+	const topRenderPass = new RenderPass(scene, topCameraRef.current);
+	const bottomRenderPass = new RenderPass(scene, bottomCameraRef.current);
 
-	composer.addPass(renderPass);
-	composer.addPass(pixelPass);
+	const topPixelPass = new ShaderPass(PixelArtShader);
+	const bottomPixelPass = new ShaderPass(PixelArtShader);
+
+	topComposer.addPass(topRenderPass);
+	topComposer.addPass(topPixelPass);
+
+	bottomComposer.addPass(bottomRenderPass);
+	bottomComposer.addPass(bottomPixelPass);
 
 	const handleResize = () => {
-		if ('left' in cameraRef.current) {
-			// OrthographicCamera
-			const zoom = 150;
-			cameraRef.current.left = -window.innerWidth / zoom;
-			cameraRef.current.right = window.innerWidth / zoom;
-			cameraRef.current.top = window.innerHeight / zoom;
-			cameraRef.current.bottom = -window.innerHeight / zoom;
-			cameraRef.current.updateProjectionMatrix();
-		} else {
-			// PerspectiveCamera
-			cameraRef.current.aspect = window.innerWidth / window.innerHeight;
-			cameraRef.current.updateProjectionMatrix();
+		const w = window.innerWidth;
+		const h = window.innerHeight;
+		const gap = 4;
+
+		const topHeight = h * 0.7 - gap / 2;
+		const bottomHeight = h * 0.3 - gap / 2;
+
+		renderer.setSize(w, h);
+
+		// Update top camera aspect
+		if (topCameraRef.current && topCameraRef.current.isPerspectiveCamera) {
+			topCameraRef.current.aspect = w / topHeight;
+			topCameraRef.current.updateProjectionMatrix();
 		}
 
-		renderer.setSize(window.innerWidth, window.innerHeight);
-		composer.setSize(window.innerWidth, window.innerHeight);
-		pixelPass.uniforms['resolution'].value.set(window.innerWidth, window.innerHeight);
+		// Update bottom camera frustum
+		if (bottomCameraRef.current && bottomCameraRef.current.isOrthographicCamera) {
+			const zoom = 150;
+			bottomCameraRef.current.left = -w / zoom;
+			bottomCameraRef.current.right = w / zoom;
+			bottomCameraRef.current.top = bottomHeight / zoom;
+			bottomCameraRef.current.bottom = -bottomHeight / zoom;
+			bottomCameraRef.current.updateProjectionMatrix();
+		}
+
+		// Resize post-processors and shaders
+		topComposer.setSize(w, topHeight);
+		topPixelPass.uniforms['resolution'].value.set(w, topHeight);
+		topPixelPass.uniforms['pixelSize'].value = 3.0;
+
+		bottomComposer.setSize(w, bottomHeight);
+		bottomPixelPass.uniforms['resolution'].value.set(w, bottomHeight);
+		bottomPixelPass.uniforms['pixelSize'].value = 3.0;
+
+		// Append overlay divs for top and bottom viewports
+		const topDiv = document.createElement('div');
+		topDiv.id = 'topViewport';
+		topDiv.style.position = 'absolute';
+		topDiv.style.top = '0';
+		topDiv.style.left = '0';
+		topDiv.style.width = '100%';
+		topDiv.style.height = '70%';
+		// topDiv.style.pointerEvents = 'none';
+		topDiv.style.zIndex = '10';
+		document.body.appendChild(topDiv);
+
+		const bottomDiv = document.createElement('div');
+		bottomDiv.id = 'bottomViewport';
+		bottomDiv.style.position = 'absolute';
+		bottomDiv.style.bottom = '0';
+		bottomDiv.style.left = '0';
+		bottomDiv.style.width = '100%';
+		bottomDiv.style.height = '30%';
+		// bottomDiv.style.pointerEvents = 'none';
+		bottomDiv.style.zIndex = '10';
+		document.body.appendChild(bottomDiv);
 	};
 
 	window.addEventListener('resize', handleResize);
+	handleResize(); // Call once on init
 
 	const animate = () => {
-		renderPass.camera = cameraRef.current;
-		composer.render();
+		const w = window.innerWidth;
+		const h = window.innerHeight;
+		const gap = 4;
+
+		const topHeight = h * 0.7 - gap / 2;
+		const bottomHeight = h * 0.3 - gap / 2;
+
+		// === Top Viewport (Perspective)
+		renderer.setViewport(0, bottomHeight + gap, w, topHeight);
+		renderer.setScissor(0, bottomHeight + gap, w, topHeight);
+		topComposer.render();
+
+		// === Bottom Viewport (Ortho)
+		renderer.setViewport(0, 0, w, bottomHeight);
+		renderer.setScissor(0, 0, w, bottomHeight);
+		bottomComposer.render();
+
 		requestAnimationFrame(animate);
 	};
 	animate();
@@ -71,6 +123,9 @@ export const initGraphics = (scene, cameraRef) => {
 			window.removeEventListener('resize', handleResize);
 			renderer.dispose();
 			document.body.removeChild(renderer.domElement);
+			document.body.removeChild(document.getElementById('topViewport'));
+			document.body.removeChild(document.getElementById('bottomViewport'));
 		},
+		renderer,
 	};
 };

@@ -3,16 +3,9 @@ import * as THREE from 'three';
 import { useAnimator } from '../../hooks/useAnimator';
 import Horse from './Horse';
 import { setPovCamera } from '../../utils/cameraTransitions';
+import Lance from './objects/Lance';
 
-export default function Player({
-	scene,
-	position,
-	playerRef,
-	opponentRef,
-	team,
-	povCameraRef,
-	flipped,
-}) {
+export default function Player({ scene, position, playerRef, team, flipped, cameraRef }) {
 	// const modelPath = '/models/knights/blue_knight.glb';
 
 	// Local storage of the current animation playing
@@ -31,7 +24,7 @@ export default function Player({
 	// Init the model position and animation
 	useEffect(() => {
 		if (!sphereRef.current) {
-			const geometry = new THREE.SphereGeometry(0.5, 4, 4);
+			const geometry = new THREE.SphereGeometry(0.25, 4, 4);
 			const material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
 			sphereRef.current = new THREE.Mesh(geometry, material);
 			sphereRef.current.name = 'Player sphere';
@@ -42,13 +35,6 @@ export default function Player({
 		}
 	}, []);
 
-	// Init camera lookat opponent
-	useEffect(() => {
-		if (!opponentRef.current) {
-			povCameraRef.current.position = playerRef.current.position;
-		}
-	}, [opponentRef.current, position]);
-
 	// Update loop
 	useEffect(() => {
 		if (!position || !sphereRef.current) return;
@@ -58,6 +44,11 @@ export default function Player({
 
 	return (
 		<>
+			<Lance
+				scene={scene}
+				cameraRef={cameraRef}
+				playerRef={playerRef}
+			/>
 			<Horse
 				scene={scene}
 				position={{ x: position.x, y: position.y - 2.5, z: position.z }}

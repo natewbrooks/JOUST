@@ -22,7 +22,7 @@ export default function Opponent({ scene, position, opponentRef, team, flipped }
 	// Init the model position and animation
 	useEffect(() => {
 		if (!sphereRef.current) {
-			const geometry = new THREE.SphereGeometry(0.5, 4, 4);
+			const geometry = new THREE.SphereGeometry(0.25, 4, 4);
 			const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 			sphereRef.current = new THREE.Mesh(geometry, material);
 			sphereRef.current.name = 'Opponent sphere';

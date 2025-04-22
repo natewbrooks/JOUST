@@ -37,3 +37,8 @@ body {
   padding: 0;
   overflow: hidden;
 }
+
+#topViewport,
+#bottomViewport {
+  cursor: none;
+}
