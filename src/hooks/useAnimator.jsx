@@ -8,6 +8,8 @@ export function useAnimator(name, path, scene, onLoaded) {
 	const [animations, setAnimations] = useState([]);
 	const [modelName, setModelName] = useState(name);
 	const [loadedTexture, setLoadedTexture] = useState(null);
+
+	const modelRef = useRef(null);
 	const [model, setModel] = useState(null);
 	const [mixer, setMixer] = useState(null);
 
@@ -34,6 +36,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 				scene.add(loadedModel);
 
 				setModel(loadedModel);
+				modelRef.current = loadedModel;
 				setMixer(new AnimationMixer(loadedModel));
 
 				// Set model animations nested in GLTF/GLB file
@@ -55,8 +58,8 @@ export function useAnimator(name, path, scene, onLoaded) {
 		);
 
 		return () => {
-			if (model) {
-				scene.remove(model);
+			if (modelRef.current) {
+				scene.remove(modelRef.current);
 			}
 		};
 	}, []);
@@ -76,7 +79,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 
 		setLoadedTexture(texture);
 
-		model.traverse((child) => {
+		modelRef.current.traverse((child) => {
 			if (child instanceof THREE.Mesh) {
 				child.material.map = texture;
 				console.log('Material changed to: ' + texture.name);
@@ -123,7 +126,7 @@ export function useAnimator(name, path, scene, onLoaded) {
 	}, [updateMixer]);
 
 	return {
-		model: model,
+		model: modelRef.current,
 		animations: animations,
 		playAnimation,
 		setMaterial,

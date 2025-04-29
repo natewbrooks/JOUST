@@ -76,7 +76,7 @@ export const setPovCamera = (
 		const dummy = { t: 0 };
 		gsap.to(dummy, {
 			t: 1,
-			duration: 1.5,
+			duration: 2.5,
 			ease: 'power2.out',
 			onUpdate: () => {
 				const interpolated = currentLookAt.clone().lerp(lookTarget, dummy.t);

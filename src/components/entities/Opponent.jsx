@@ -25,11 +25,13 @@ export default function Opponent({ scene, position, opponentRef, team, flipped }
 			const geometry = new THREE.SphereGeometry(0.25, 4, 4);
 			const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 			sphereRef.current = new THREE.Mesh(geometry, material);
-			sphereRef.current.name = 'Opponent sphere';
+			sphereRef.current.name = 'OpponentHead';
+			sphereRef.current.userData = { type: 'opponent', part: 'head' }; // Tagging opponent head
+
 			sphereRef.current.rotation.set(0, flipped ? Math.PI / 2 : -Math.PI / 2, 0);
 			scene.add(sphereRef.current);
 
-			opponentRef.current = sphereRef.current; // Passes the model ref back up to parent
+			opponentRef.current = sphereRef.current; // Pass back up
 		}
 	}, []);
 

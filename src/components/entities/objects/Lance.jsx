@@ -2,53 +2,53 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { getCameraForwardPlane } from '../../../utils/cameraTransitions';
 import GameState from '../../../game-state.js';
+import { useAnimator } from '../../../hooks/useAnimator.jsx';
 
-export default function Lance({ scene, cameraRef, playerRef }) {
-	// const modelPath = '/models/knights/blue_knight.glb';
+export default function Lance({ scene, cameraRef, playerRef, position }) {
+	const modelPath = '/models/lance/Lance.glb';
 
 	// Local storage of the current animation playing
-	const [currentAnimation, setCurrentAnimation] = useState('');
+	// const [currentAnimation, setCurrentAnimation] = useState('');
 	// Names of animations embedded in the models .glb
-	const [animationNames, setAnimationNames] = useState([]);
+	// const [animationNames, setAnimationNames] = useState([]);
 	const baseSphereRef = useRef(null);
 	const tipSphereRef = useRef(null);
 	const coneMeshRef = useRef(null);
+
+	const hasHitThisRound = useRef(false);
+	const mousePosRef = useRef(null);
 
 	const planeRef = useRef(null);
 	const rayLineRef = useRef(null);
 	const raycaster = new THREE.Raycaster();
 	const mouse = new THREE.Vector2();
 
-	// Create the model and animator instance
-	// const { model, animations, playAnimation, setMaterial, material } = useAnimator(
-	// 	'Blue Knight',
-	// 	modelPath,
-	// 	scene
-	// );
+	// Use a ref for the aim vector instead of recreating it every frame
+	const aimVectorRef = useRef(new THREE.Vector3(0, 0, -1));
 
-	// Init the model position and animation
+	// Create the model and animator instance
+	const { model, animations, playAnimation, setMaterial, material } = useAnimator(
+		'Red Lance',
+		modelPath,
+		scene
+	);
+
+	// Init the debug spheres
 	useEffect(() => {
 		if (!baseSphereRef.current || !tipSphereRef.current) {
 			let geometry = new THREE.SphereGeometry(0.2, 4, 4);
 			let material = new THREE.MeshBasicMaterial({ color: 0x50a05a });
 			baseSphereRef.current = new THREE.Mesh(geometry, material);
 			baseSphereRef.current.name = '[LANCE] Base sphere';
-			// sphereRef.current.rotation.set(0, flipped ? Math.PI / 2 : -Math.PI / 2, 0);
 			scene.add(baseSphereRef.current);
 
-			geometry = new THREE.SphereGeometry(0.1, 4, 4);
+			geometry = new THREE.SphereGeometry(0.2, 4, 4);
 			material = new THREE.MeshBasicMaterial({ color: 0x883ead });
 			tipSphereRef.current = new THREE.Mesh(geometry, material);
 			tipSphereRef.current.name = '[LANCE] Tip sphere';
 			scene.add(tipSphereRef.current);
 
-			const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x3333ff });
-			const coneGeometry = new THREE.ConeGeometry(0.2, 1, 16, 1, true); // open-ended cone
-			coneMeshRef.current = new THREE.Mesh(coneGeometry, coneMaterial);
-			coneMeshRef.current.name = '[LANCE] Cone';
-			scene.add(coneMeshRef.current);
-
-			// show line coming out from tip of lance
+			// Line only if debug mode ON
 			if (GameState.debug) {
 				const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
 				const points = [new THREE.Vector3(), new THREE.Vector3()];
@@ -60,28 +60,14 @@ export default function Lance({ scene, cameraRef, playerRef }) {
 		}
 	}, []);
 
+	// Toggle sphere visibility dynamically based on GameState.debug
+	useEffect(() => {
+		if (baseSphereRef.current) baseSphereRef.current.visible = GameState.debug;
+		if (tipSphereRef.current) tipSphereRef.current.visible = GameState.debug;
+		if (rayLineRef.current) rayLineRef.current.visible = GameState.debug;
+	}, [GameState.debug]);
+
 	// Init mouse move listener
-	// useEffect(() => {
-	// 	if (!baseSphereRef || !tipSphereRef.current) return;
-
-	// 	const onMouseMove = (event) => {
-	// 		const w = window.innerWidth;
-	// 		const h = window.innerHeight;
-	// 		const gap = 4;
-	// 		const topHeight = h * 0.7 - gap / 2;
-	// 		const topYStart = h - topHeight;
-
-	// 		if (event.clientY < topYStart) return;
-
-	// 		const relativeY = event.clientY - topYStart;
-	// 		mouse.x = (event.clientX / w) * 2 - 1;
-	// 		mouse.y = -(relativeY / topHeight) * 2 + 1;
-	// 	};
-
-	// 	window.addEventListener('mousemove', onMouseMove);
-	// 	return () => window.removeEventListener('mousemove', onMouseMove);
-	// }, []);
-
 	useEffect(() => {
 		if (!baseSphereRef || !tipSphereRef.current) return;
 
@@ -92,11 +78,40 @@ export default function Lance({ scene, cameraRef, playerRef }) {
 			// Normalize mouse X/Y to full screen space (-1 to 1)
 			mouse.x = (event.clientX / w) * 2 - 1;
 			mouse.y = -(event.clientY / h) * 2 + 1;
+
+			mousePosRef.current = new THREE.Vector2(mouse.x, mouse.y);
+			// console.log(mouse);
 		};
 
 		window.addEventListener('mousemove', onMouseMove);
 		return () => window.removeEventListener('mousemove', onMouseMove);
 	}, []);
+
+	useEffect(() => {
+		if (!model || !cameraRef.current || !mousePosRef.current) return;
+
+		const offset = new THREE.Vector3(0, 0.5, 0); // Small height offset
+		model.position.set(position.x, position.y - offset.y, position.z);
+
+		// Map mouse screen pos (-1 to 1) into a 3D world direction
+
+		// Create a raycaster based on mousePosRef
+		const tempRaycaster = new THREE.Raycaster();
+		tempRaycaster.setFromCamera(mousePosRef.current, cameraRef.current);
+
+		// Use the ray's direction as where the mouse points
+		const mouseDirection = tempRaycaster.ray.direction.clone().normalize();
+
+		// Create a quaternion from model forward (+Z) to mouse direction
+		const forwardVector = new THREE.Vector3(0, 0, 1); // Assuming model points +Z originally
+		const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
+			forwardVector,
+			mouseDirection
+		);
+
+		// Set model rotation
+		model.quaternion.copy(targetQuaternion);
+	}, [position, model, cameraRef, mousePosRef.current]);
 
 	// Continuous update
 	useEffect(() => {
@@ -111,78 +126,36 @@ export default function Lance({ scene, cameraRef, playerRef }) {
 			)
 				return;
 
-			// Update base to player position
 			const playerPos = playerRef.current.position.clone();
 
-			// Recompute camera-facing plane every frame
 			planeRef.current = getCameraForwardPlane(cameraRef.current, 50);
 
-			// Recalculate the intersection based on mouse position
 			raycaster.setFromCamera(mouse, cameraRef.current);
 			const intersection = new THREE.Vector3();
 
 			if (raycaster.ray.intersectPlane(planeRef.current, intersection)) {
-				// Create aim vector relative to player position, not previous lance position
-				const aimVector = new THREE.Vector3().subVectors(intersection, playerPos).normalize();
+				// Update the aimVectorRef instead of creating a new vector
+				aimVectorRef.current.subVectors(intersection, playerPos).normalize();
 
-				// Player direction constraints
-				const playerForward = new THREE.Vector3(0, 0, -1);
-				playerRef.current.getWorldDirection(playerForward).normalize();
-				const playerRight = new THREE.Vector3()
-					.crossVectors(playerForward, new THREE.Vector3(0, 1, 0))
-					.normalize();
+				// Compute positions
+				const offset = new THREE.Vector3(0, 0.5, 0); // Height offset
+				const basePos = playerPos.clone().sub(offset);
 
-				// Check if aim is on left side and clamp if needed
-				const dot = aimVector.dot(playerRight);
-				if (dot < 0) {
-					const clampedAim = aimVector.clone().projectOnPlane(playerRight).normalize();
-					aimVector.copy(clampedAim);
-				}
+				// Use the actual mouse intersection point for tip position
+				// This directly follows the mouse cursor
+				const lanceLength = 3.5;
+				const tipPos = basePos
+					.clone()
+					.add(aimVectorRef.current.clone().multiplyScalar(lanceLength));
 
-				// Always calculate positions based on player position, not based on previous lance position
-				const tipPos = playerPos.clone().add(aimVector.clone().multiplyScalar(2));
-				const basePos = playerPos.clone();
-				const offset = new THREE.Vector3(0, 0.5, 0);
+				// Update debug spheres
+				baseSphereRef.current.position.copy(basePos);
+				tipSphereRef.current.position.copy(tipPos);
 
-				// Update lance positions
-				tipSphereRef.current.position.copy(tipPos.clone().sub(offset));
-				baseSphereRef.current.position.copy(basePos.clone().sub(offset));
-
-				// Update cone geometry
-				if (coneMeshRef.current) {
-					const direction = new THREE.Vector3().subVectors(
-						tipSphereRef.current.position,
-						baseSphereRef.current.position
-					);
-					const length = direction.length();
-
-					coneMeshRef.current.scale.set(1, length, 0.5);
-
-					const midPoint = new THREE.Vector3()
-						.addVectors(baseSphereRef.current.position, tipSphereRef.current.position)
-						.multiplyScalar(0.5);
-					coneMeshRef.current.position.copy(midPoint);
-
-					coneMeshRef.current.quaternion.setFromUnitVectors(
-						new THREE.Vector3(0, 1, 0),
-						direction.clone().normalize()
-					);
-				}
-
-				// Now set up raycaster for collision detection (after positioning lance)
-				const lanceDirection = new THREE.Vector3()
-					.subVectors(tipSphereRef.current.position, baseSphereRef.current.position)
-					.normalize();
-
-				raycaster.set(baseSphereRef.current.position, lanceDirection);
-
-				// Debug ray
+				// Update debug ray line
 				if (GameState.debug && rayLineRef.current) {
-					const rayStart = baseSphereRef.current.position.clone();
-					const rayEnd = tipSphereRef.current.position
-						.clone()
-						.add(lanceDirection.clone().multiplyScalar(0.5));
-
+					const rayStart = basePos.clone();
+					const rayEnd = tipPos.clone();
 					const positions = rayLineRef.current.geometry.attributes.position.array;
 					positions[0] = rayStart.x;
 					positions[1] = rayStart.y;
@@ -193,28 +166,48 @@ export default function Lance({ scene, cameraRef, playerRef }) {
 					rayLineRef.current.geometry.attributes.position.needsUpdate = true;
 				}
 
-				// Check for collisions
+				// Collision check
+				const lanceDirection = new THREE.Vector3().subVectors(tipPos, basePos).normalize();
+				raycaster.set(basePos, lanceDirection);
+
 				const ignored = new Set([
 					baseSphereRef.current.uuid,
 					tipSphereRef.current.uuid,
-					coneMeshRef.current.uuid,
 					playerRef.current.uuid,
+					model?.uuid,
 					rayLineRef.current?.uuid,
 				]);
 
-				const intersects = raycaster
-					.intersectObjects(scene.children, true)
-					.filter((hit) => !ignored.has(hit.object.uuid));
+				if (model) {
+					model.traverse((child) => {
+						ignored.add(child.uuid);
+					});
+				}
 
-				if (intersects.length > 0) {
-					console.log('Hit object:', intersects[0].object);
-					// Handle collision here
+				const intersects = raycaster.intersectObjects(scene.children, true).filter((hit) => {
+					const obj = hit.object;
+
+					// Only accept if tagged as opponent
+					return obj.userData?.type === 'opponent';
+				});
+
+				if (intersects.length > 0 && !hasHitThisRound.current) {
+					const firstHit = intersects[0].object;
+
+					console.log('✅ Hit opponent:', firstHit.name);
+
+					hasHitThisRound.current = true; // Mark that we've already hit this round
+
+					// Optional: headshot check
+					if (firstHit.userData.part === 'head') {
+						console.log('💥 HEADSHOT!');
+					}
 				}
 			}
 		};
 
 		update();
-	}, [cameraRef, playerRef]);
+	}, [cameraRef, playerRef, model]);
 
 	return <></>;
 }

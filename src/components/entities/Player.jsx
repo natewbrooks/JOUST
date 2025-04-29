@@ -48,6 +48,7 @@ export default function Player({ scene, position, playerRef, team, flipped, came
 				scene={scene}
 				cameraRef={cameraRef}
 				playerRef={playerRef}
+				position={position}
 			/>
 			<Horse
 				scene={scene}
