@@ -42,68 +42,89 @@ export const swapCameraView = (
 
 export const setPovCamera = (
 	camera,
-	targetPosition,
-	lookAtPosition,
+	// povPosition,
+	// lookAtPosition,
 	isInit,
-	player,
-	horsesPassed
+	anchor
+	// horsesPassed
 ) => {
-	if (!camera) return;
+	if (!camera || !anchor) return;
 
-	const offset = new THREE.Vector3(0, 1.5, 0); // Offset above head height
+	anchor.add(camera);
 
-	if (horsesPassed) {
-		// Player's world position + offset
-		const playerPosition = player.position.clone().add(offset);
-		camera.position.copy(playerPosition);
+	const offset = new THREE.Vector3(0, 0.5, 0.5); // Offset above head height
+	const targetPosition = anchor.position;
 
-		// Forward direction
-		const forward = new THREE.Vector3();
-		player.getWorldDirection(forward).normalize();
+	const forwardDirection = new THREE.Vector3();
+	anchor.getWorldDirection(forwardDirection).negate();
 
-		// Camera should look slightly ahead
-		const lookTarget = playerPosition.clone().add(forward);
+	// console.log(forw	ardDirection);
 
-		const currentLookAt = new THREE.Vector3();
-		camera.getWorldDirection(currentLookAt).add(camera.position);
+	// if (horsesPassed) {
+	// 	// Player's world position + offset
+	// 	const playerPosition = player.position.clone().add(offset);
+	// 	camera.position.copy(playerPosition);
 
-		const dummy = { t: 0 };
-		gsap.to(dummy, {
-			t: 1,
-			duration: 2.5,
-			ease: 'power2.out',
-			onUpdate: () => {
-				const interpolated = currentLookAt.clone().lerp(lookTarget, dummy.t);
-				camera.lookAt(interpolated);
-			},
-			onComplete: () => {
-				camera.lookAt(lookTarget);
-			},
-		});
-		return;
-	}
+	// 	// Forward direction
+	// 	const forward = new THREE.Vector3();
+	// 	player.getWorldDirection(forward).normalize();
+
+	// 	// Camera should look slightly ahead
+	// 	const lookTarget = playerPosition.clone().add(forward);
+
+	// 	const currentLookAt = new THREE.Vector3();
+	// 	camera.getWorldDirection(currentLookAt).add(camera.position);
+
+	// 	const dummy = { t: 0 };
+	// 	gsap.to(dummy, {
+	// 		t: 1,
+	// 		duration: 2.5,
+	// 		ease: 'power2.out',
+	// 		onUpdate: () => {
+	// 			const interpolated = currentLookAt.clone().lerp(lookTarget, dummy.t);
+	// 			camera.lookAt(interpolated);
+	// 		},
+	// 		onComplete: () => {
+	// 			camera.lookAt(lookTarget);
+	// 		},
+	// 	});
+	// 	return;
+	// }
 
 	// Apply offset to target position for both init and tween
-	const adjustedTarget = targetPosition.clone().add(offset);
+	const adjustedTargetPos = targetPosition.clone().add(offset);
+
+	console.log('ANCHOR ROT:', anchor.rotation);
+	console.log('CAMERA ROT:', camera.rotation);
+
+	function animate() {
+		requestAnimationFrame(animate);
+
+		// Rotate around Y-axis (up axis in Three.js)
+		anchor.rotation.y += 0.00001; // Adjust speed here
+	}
+
+	animate();
 
 	if (isInit) {
 		gsap.to(camera.position, {
-			x: adjustedTarget.x,
-			y: adjustedTarget.y,
-			z: adjustedTarget.z,
+			x: adjustedTargetPos.x,
+			y: adjustedTargetPos.y,
+			z: adjustedTargetPos.z,
 			duration: 1,
 			ease: 'power2.inOut',
-			onUpdate: () => {
-				camera.lookAt(lookAtPosition);
-			},
-			onComplete: () => {
-				camera.lookAt(lookAtPosition);
-			},
+			// onUpdate: () => {
+			// 	camera.lookAt(forwardDirection);
+			// },
+			// onComplete: () => {
+			// 	camera.lookAt(forwardDirection);
+			// },
 		});
 	} else {
-		camera.position.set(adjustedTarget.x, adjustedTarget.y, adjustedTarget.z);
-		camera.lookAt(lookAtPosition);
-		isInit = true; // Not persistent (if you want persistence, use ref)
+		camera.position.set(adjustedTargetPos.x, adjustedTargetPos.y, adjustedTargetPos.z);
+
+		// camera.lookAt(forwardDirection);
+		isInit = true;
 	}
 };
 

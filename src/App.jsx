@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
 
-import ButtonPromptUI from './components/ui/ButtonPromptUI';
-import Horse from './components/entities/Horse.jsx';
-import { swapCameraView, setSideViewCamera, setPovCamera } from './utils/cameraTransitions.jsx';
+import Cameras from './components/entities/objects/Cameras.jsx';
 
-import { initGraphics } from './utils/initGraphics.jsx';
 import Player from './components/entities/Player.jsx';
 import Opponent from './components/entities/Opponent.jsx';
 
@@ -14,14 +11,15 @@ import GameState from './game-state.js';
 
 function App() {
 	const sceneRef = useRef(new THREE.Scene());
-	const mainCameraRef = useRef();
-	const sideViewCameraRef = useRef(); // ORTHOGRAPHIC CAMERA
-	const playerPovCameraRef = useRef(); // PERSPECTIVE CAMERA
+	// Camera stuff
+	const sideViewCameraRef = useRef(null); // ORTHOGRAPHIC CAMERA
+	const playerPovCameraRef = useRef(null); // PERSPECTIVE CAMERA
+	const camerasInitRef = useRef(false); // IS PLAYER POV CAMERA INITIALIZED
+	const povCameraAnchorRef = useRef(null); // The players neck bone ref
 
-	const povCameraInitRef = useRef(false); // IS PLAYER POV CAMERA INITIALIZED
-
-	const playerRef = useRef(); // PLAYER REF
-	const opponentRef = useRef(); // Opponent REF
+	// Knight stuff
+	const playerRef = useRef(null); // PLAYER REF
+	const opponentRef = useRef(null); // Opponent REF
 
 	const [opponentMPH, setOpponentMPH] = useState(0);
 	const [playerMPH, setPlayerMPH] = useState(0);
@@ -43,36 +41,6 @@ function App() {
 
 	const horsesPassedRef = useRef(false);
 	const hasAnimatedRef = useRef(false); // Track if the stop animation already ran
-
-	// Init cameras and graphics
-	useEffect(() => {
-		const scene = sceneRef.current;
-
-		const zoom = 150;
-		const orthoCamera = new THREE.OrthographicCamera(
-			-window.innerWidth / zoom,
-			window.innerWidth / zoom,
-			window.innerHeight / zoom,
-			-window.innerHeight / zoom,
-			0.1,
-			200
-		);
-		orthoCamera.position.z = 10;
-
-		const perspectiveCamera = new THREE.PerspectiveCamera(
-			80,
-			window.innerWidth / window.innerHeight
-		);
-
-		// For a wider view to frame horses:
-		setSideViewCamera(orthoCamera, { distance: 20, height: 1.5, zoom: 75 });
-
-		sideViewCameraRef.current = orthoCamera;
-		playerPovCameraRef.current = perspectiveCamera;
-
-		const { dispose } = initGraphics(scene, playerPovCameraRef, sideViewCameraRef);
-		return () => dispose();
-	}, []);
 
 	useEffect(() => {
 		GameState.startRound();
@@ -161,21 +129,18 @@ function App() {
 		};
 	}, []);
 
-	useEffect(() => {
-		if (playerRef.current && opponentRef.current) {
-			setPovCamera(
-				playerPovCameraRef.current,
-				playerRef.current.position,
-				opponentRef.current.position,
-				povCameraInitRef.current,
-				playerRef.current,
-				horsesPassedRef.current
-			);
-		}
-	}, [playerPos, opponentPos]);
-
 	return (
 		<div>
+			<Cameras
+				sceneRef={sceneRef}
+				playerRef={playerRef}
+				opponentRef={opponentRef}
+				playerPovCameraRef={playerPovCameraRef}
+				sideViewCameraRef={sideViewCameraRef}
+				camerasInitRef={camerasInitRef}
+				povCameraAnchorRef={povCameraAnchorRef}
+				playerPos={playerPos}
+			/>
 			<Opponent
 				scene={sceneRef.current}
 				opponentRef={opponentRef}
@@ -190,6 +155,7 @@ function App() {
 				position={playerPos}
 				team={'blue'}
 				flipped={true}
+				povCameraAnchorRef={povCameraAnchorRef}
 			/>
 
 			<div className='banner border-b-8 border-darkcream'>

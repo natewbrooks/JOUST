@@ -5,13 +5,22 @@ import Horse from './Horse';
 import { setPovCamera } from '../../utils/cameraTransitions';
 import Lance from './objects/Lance';
 
-export default function Player({ scene, position, playerRef, team, flipped, cameraRef }) {
+export default function Player({
+	scene,
+	position,
+	playerRef,
+	team,
+	flipped,
+	cameraRef,
+	povCameraAnchorRef,
+}) {
 	const modelPath = '/models/knights/Knight.glb';
 
 	const [currentAnimation, setCurrentAnimation] = useState('');
 	const [animationNames, setAnimationNames] = useState([]);
 
 	const handRef = useRef(null);
+	const neckRef = useRef(null);
 
 	// Load the Knight model
 	const { model, animations, playAnimation, setMaterial, material } = useAnimator(
@@ -23,18 +32,23 @@ export default function Player({ scene, position, playerRef, team, flipped, came
 			playerRef.current = loadedModel;
 
 			// Find the right hand bone
-			let handBone = null;
+			let handBone = null,
+				neckBone = null;
 			loadedModel.traverse((child) => {
-				if (child.isBone && child.name.toLowerCase().includes('handr')) {
-					handBone = child;
+				if (child.isBone) {
+					if (child.name.toLowerCase().includes('handr')) {
+						handBone = child;
+						console.log('Found Hand.R bone:', handBone.name);
+						handRef.current = handBone;
+					} else if (child.name.toLowerCase().includes('neck')) {
+						neckBone = child;
+						console.log('Found Neck bone:', neckBone.name);
+						neckRef.current = neckBone;
+						// Pass pov camera anchor to parent
+						povCameraAnchorRef.current = neckRef.current;
+					}
 				}
-				console.log(child.isBone ? child : '');
 			});
-
-			if (handBone) {
-				console.log('✅ Found Hand.R bone:', handBone.name);
-				handRef.current = handBone; // 👈 NEW: expose this to Lance
-			}
 		}
 	);
 
