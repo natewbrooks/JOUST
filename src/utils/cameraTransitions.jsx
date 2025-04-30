@@ -40,10 +40,6 @@ export const swapCameraView = (
 	});
 };
 
-/**
- * Sets the camera to the target (players) position and looks at object (opponent)
- * @param {THREE.Camera} camera - The camera to move
- */
 export const setPovCamera = (
 	camera,
 	targetPosition,
@@ -54,25 +50,23 @@ export const setPovCamera = (
 ) => {
 	if (!camera) return;
 
-	const offset = new THREE.Vector3(0, 0, 0); // Not used right now but kept for future customization
+	const offset = new THREE.Vector3(0, 1.5, 0); // Offset above head height
 
-	// If the horses have passed, don't look at the opponent anymore
 	if (horsesPassed) {
-		camera.position.copy(player.position); // Snap to player position
+		// Player's world position + offset
+		const playerPosition = player.position.clone().add(offset);
+		camera.position.copy(playerPosition);
 
-		// Get the forward direction from the player
+		// Forward direction
 		const forward = new THREE.Vector3();
-		player.getWorldDirection(forward);
-		forward.normalize();
+		player.getWorldDirection(forward).normalize();
 
-		// Determine the final target the camera should look at
-		const lookTarget = player.position.clone().add(forward);
+		// Camera should look slightly ahead
+		const lookTarget = playerPosition.clone().add(forward);
 
-		// Get current camera look direction (as a point in space)
 		const currentLookAt = new THREE.Vector3();
 		camera.getWorldDirection(currentLookAt).add(camera.position);
 
-		// Animate the lookAt direction
 		const dummy = { t: 0 };
 		gsap.to(dummy, {
 			t: 1,
@@ -86,28 +80,30 @@ export const setPovCamera = (
 				camera.lookAt(lookTarget);
 			},
 		});
-
 		return;
 	}
 
-	// If initialized, tween to target and track opponent
+	// Apply offset to target position for both init and tween
+	const adjustedTarget = targetPosition.clone().add(offset);
+
 	if (isInit) {
 		gsap.to(camera.position, {
-			...targetPosition,
+			x: adjustedTarget.x,
+			y: adjustedTarget.y,
+			z: adjustedTarget.z,
 			duration: 1,
 			ease: 'power2.inOut',
 			onUpdate: () => {
 				camera.lookAt(lookAtPosition);
 			},
 			onComplete: () => {
-				camera.lookAt(lookAtPosition); // final snap
+				camera.lookAt(lookAtPosition);
 			},
 		});
 	} else {
-		// First-time setup
-		camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
+		camera.position.set(adjustedTarget.x, adjustedTarget.y, adjustedTarget.z);
 		camera.lookAt(lookAtPosition);
-		isInit = true; // this won't persist — see below
+		isInit = true; // Not persistent (if you want persistence, use ref)
 	}
 };
 

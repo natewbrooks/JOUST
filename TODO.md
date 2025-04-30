@@ -91,3 +91,24 @@ Create a 3D jousting game in the browser with pixelated visuals, side-scrolling 
 - [ ] Tournament bracket with escalating opponents
 - [ ] Unlockable armor and lance cosmetics
 - [ ] Dialogue and story mode with rise-to-noble arc
+
+- Make the camera attached to the head, rotate between -45 and 45 horizontally. The head/neck will rotate with the rotation of the camera
+- Make the lance move with the hand/arm of the knight
+- Make the feet of the knight saddle the horse
+- Add skeleton highlighting (face,body)
+
+THEN
+
+- Collision, points system
+- Sound effects + music
+- Round system
+- After a round, do what currently is done, but have them finish the run, then walk offscreen, and then appear at the opposite side of the screen (like pacman) walk into place, and then start countdown for next round.
+- Show UI of points as lances
+- Add shields to the top of the UI and medievalize the UI
+
+EXTRA
+
+- Add crossing lances animation as the countdown alternative
+- Add the pan to the king with an animation deciding who won (create two animations, one where he picks one side, the other the other side)
+- Add an end screen after the bout is done with the winning lance shaking his head yes in excitement and the loser shaking their head no defeated (like melee endscreens)
+- Figure out scaling to different viewports

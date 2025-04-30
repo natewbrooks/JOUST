@@ -4,7 +4,7 @@ import { getCameraForwardPlane } from '../../../utils/cameraTransitions';
 import GameState from '../../../game-state.js';
 import { useAnimator } from '../../../hooks/useAnimator.jsx';
 
-export default function Lance({ scene, cameraRef, playerRef, position }) {
+export default function Lance({ scene, cameraRef, position, handRef }) {
 	const modelPath = '/models/lance/Lance.glb';
 
 	// Local storage of the current animation playing
@@ -30,7 +30,34 @@ export default function Lance({ scene, cameraRef, playerRef, position }) {
 	const { model, animations, playAnimation, setMaterial, material } = useAnimator(
 		'Red Lance',
 		modelPath,
-		scene
+		scene,
+		() => {
+			const baseMaterials = [
+				new THREE.MeshStandardMaterial({ color: 0xff0000 }), // Red
+				new THREE.MeshStandardMaterial({ color: 0x0000ff }), // Blue
+				new THREE.MeshStandardMaterial({ color: 0x800080 }), // Purple
+				new THREE.MeshStandardMaterial({ color: 0xffa500 }), // Orange
+				new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // Green
+				new THREE.MeshStandardMaterial({ color: 0x000000 }), // Black
+				new THREE.MeshStandardMaterial({ color: 0xffffff }), // White
+				new THREE.MeshStandardMaterial({ color: 0x3b2f2f }), // DarkWood (brown)
+				new THREE.MeshStandardMaterial({ color: 0xdeb887 }), // Wood
+			];
+
+			const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+			scene.traverse((child) => {
+				if (!child.isMesh) return;
+
+				if (child.name.includes('Base')) {
+					child.material = getRandom(baseMaterials);
+				} else if (child.name.includes('Spiral')) {
+					child.material = getRandom(baseMaterials);
+				} else if (child.name.includes('Hilt')) {
+					child.material = getRandom(baseMaterials);
+				}
+			});
+		}
 	);
 
 	// Init the debug spheres
@@ -118,15 +145,9 @@ export default function Lance({ scene, cameraRef, playerRef, position }) {
 		const update = () => {
 			requestAnimationFrame(update);
 
-			if (
-				!playerRef.current ||
-				!cameraRef.current ||
-				!baseSphereRef.current ||
-				!tipSphereRef.current
-			)
-				return;
+			if (!cameraRef.current || !baseSphereRef.current || !tipSphereRef.current) return;
 
-			const playerPos = playerRef.current.position.clone();
+			const playerPos = new THREE.Vector3(position.x, position.y, position.z);
 
 			planeRef.current = getCameraForwardPlane(cameraRef.current, 50);
 
@@ -143,7 +164,7 @@ export default function Lance({ scene, cameraRef, playerRef, position }) {
 
 				// Use the actual mouse intersection point for tip position
 				// This directly follows the mouse cursor
-				const lanceLength = 3.5;
+				const lanceLength = 3;
 				const tipPos = basePos
 					.clone()
 					.add(aimVectorRef.current.clone().multiplyScalar(lanceLength));
@@ -173,7 +194,6 @@ export default function Lance({ scene, cameraRef, playerRef, position }) {
 				const ignored = new Set([
 					baseSphereRef.current.uuid,
 					tipSphereRef.current.uuid,
-					playerRef.current.uuid,
 					model?.uuid,
 					rayLineRef.current?.uuid,
 				]);
@@ -207,7 +227,7 @@ export default function Lance({ scene, cameraRef, playerRef, position }) {
 		};
 
 		update();
-	}, [cameraRef, playerRef, model]);
+	}, [cameraRef, model]);
 
 	return <></>;
 }
