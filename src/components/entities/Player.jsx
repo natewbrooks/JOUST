@@ -4,6 +4,7 @@ import { useAnimator } from '../../hooks/useAnimator';
 import Horse from './Horse';
 import { setPovCamera } from '../../utils/cameraTransitions';
 import Lance from './objects/Lance';
+import Shield from './objects/Shield';
 
 export default function Player({
 	scene,
@@ -19,7 +20,8 @@ export default function Player({
 	const [currentAnimation, setCurrentAnimation] = useState('');
 	const [animationNames, setAnimationNames] = useState([]);
 
-	const handRef = useRef(null);
+	const rightHandRef = useRef(null);
+	const leftHandRef = useRef(null);
 	const anchorRef = useRef(null);
 
 	// Load the Knight model
@@ -32,20 +34,26 @@ export default function Player({
 			playerRef.current = loadedModel;
 
 			// Find the right hand bone
-			let handBone = null,
-				anchorBone = null;
+			let rHandBone = null,
+				anchorBone = null,
+				lHandBone = null;
 			loadedModel.traverse((child) => {
 				if (child.isBone) {
-					if (child.name.toLowerCase().includes('handr')) {
-						handBone = child;
-						console.log('Found Hand.R bone:', handBone.name);
-						handRef.current = handBone;
-					} else if (child.name.toLowerCase().includes('head')) {
+					const childName = child.name.toLowerCase();
+					if (childName.includes('handr')) {
+						rHandBone = child;
+						console.log('Found Hand.R bone:', rHandBone.name);
+						rightHandRef.current = rHandBone;
+					} else if (childName.includes('head')) {
 						anchorBone = child;
 						console.log('Found bone:', anchorBone.name);
 						anchorRef.current = anchorBone;
 						// Pass pov camera anchor to parent
 						povCameraAnchorRef.current = anchorRef.current;
+					} else if (childName.includes('handl')) {
+						lHandBone = child;
+						console.log('Found Hand.L bone:', lHandBone.name);
+						leftHandRef.current = lHandBone;
 					}
 				}
 			});
@@ -60,11 +68,12 @@ export default function Player({
 
 	return (
 		<>
+			<Shield handRef={leftHandRef} />
 			<Lance
 				scene={scene}
 				cameraRef={cameraRef}
 				position={position}
-				handRef={handRef}
+				handRef={rightHandRef}
 			/>
 			<Horse
 				scene={scene}
