@@ -20,7 +20,7 @@ export default function Player({
 	const [animationNames, setAnimationNames] = useState([]);
 
 	const handRef = useRef(null);
-	const neckRef = useRef(null);
+	const anchorRef = useRef(null);
 
 	// Load the Knight model
 	const { model, animations, playAnimation, setMaterial, material } = useAnimator(
@@ -33,19 +33,19 @@ export default function Player({
 
 			// Find the right hand bone
 			let handBone = null,
-				neckBone = null;
+				anchorBone = null;
 			loadedModel.traverse((child) => {
 				if (child.isBone) {
 					if (child.name.toLowerCase().includes('handr')) {
 						handBone = child;
 						console.log('Found Hand.R bone:', handBone.name);
 						handRef.current = handBone;
-					} else if (child.name.toLowerCase().includes('neck')) {
-						neckBone = child;
-						console.log('Found Neck bone:', neckBone.name);
-						neckRef.current = neckBone;
+					} else if (child.name.toLowerCase().includes('head')) {
+						anchorBone = child;
+						console.log('Found bone:', anchorBone.name);
+						anchorRef.current = anchorBone;
 						// Pass pov camera anchor to parent
-						povCameraAnchorRef.current = neckRef.current;
+						povCameraAnchorRef.current = anchorRef.current;
 					}
 				}
 			});

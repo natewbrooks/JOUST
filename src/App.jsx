@@ -58,58 +58,58 @@ function App() {
 			const player = playerPosRef.current;
 			const opponent = opponentPosRef.current;
 
-			horsesPassedRef.current = player.x >= opponent.x;
+			// horsesPassedRef.current = player.x >= opponent.x;
 
-			if (horsesPassedRef.current && !hasAnimatedRef.current) {
-				hasAnimatedRef.current = true;
+			// if (horsesPassedRef.current && !hasAnimatedRef.current) {
+			// 	hasAnimatedRef.current = true;
 
-				// Animate player x to opponentStartX
-				gsap.to(player, {
-					x: opponentStartX,
-					duration: 12,
-					ease: 'power2.out',
-				});
+			// 	// Animate player x to opponentStartX
+			// 	gsap.to(player, {
+			// 		x: opponentStartX,
+			// 		duration: 12,
+			// 		ease: 'power2.out',
+			// 	});
 
-				// Animate opponent x to playerStartX
-				gsap.to(opponent, {
-					x: playerStartX,
-					duration: 12,
-					ease: 'power2.out',
-				});
+			// 	// Animate opponent x to playerStartX
+			// 	gsap.to(opponent, {
+			// 		x: playerStartX,
+			// 		duration: 12,
+			// 		ease: 'power2.out',
+			// 	});
 
-				// Animate player MPH to 0
-				gsap.to(
-					{},
-					{
-						duration: 10,
-						ease: 'power2.out',
-						onUpdate: function () {
-							setPlayerMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
-						},
-					}
-				);
+			// 	// Animate player MPH to 0
+			// 	gsap.to(
+			// 		{},
+			// 		{
+			// 			duration: 10,
+			// 			ease: 'power2.out',
+			// 			onUpdate: function () {
+			// 				setPlayerMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
+			// 			},
+			// 		}
+			// 	);
 
-				// Animate opponent MPH to 0
-				gsap.to(
-					{},
-					{
-						duration: 10,
-						ease: 'power2.out',
-						onUpdate: function () {
-							setOpponentMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
-						},
-					}
-				);
-			} else {
-				// Normal movement before pass
-				if (GameState.can_move) {
-					playerPosRef.current.x += moveSpeed * deltaTime;
-					opponentPosRef.current.x -= moveSpeed * deltaTime;
+			// 	// Animate opponent MPH to 0
+			// 	gsap.to(
+			// 		{},
+			// 		{
+			// 			duration: 10,
+			// 			ease: 'power2.out',
+			// 			onUpdate: function () {
+			// 				setOpponentMPH((prev) => gsap.utils.interpolate(prev, 0, this.progress()));
+			// 			},
+			// 		}
+			// 	);
+			// } else {
+			// Normal movement before pass
+			if (GameState.can_move) {
+				playerPosRef.current.x += moveSpeed * deltaTime;
+				opponentPosRef.current.x -= moveSpeed * deltaTime;
 
-					setPlayerMPH(moveSpeed);
-					setOpponentMPH(moveSpeed);
-				}
+				setPlayerMPH(moveSpeed);
+				setOpponentMPH(moveSpeed);
 			}
+			// }
 
 			// Sync with React state (for UI + rendering children)
 			setPlayerPos({ ...player });

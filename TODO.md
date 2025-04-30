@@ -92,10 +92,10 @@ Create a 3D jousting game in the browser with pixelated visuals, side-scrolling 
 - [ ] Unlockable armor and lance cosmetics
 - [ ] Dialogue and story mode with rise-to-noble arc
 
-- Make the camera attached to the head, rotate between -45 and 45 horizontally. The head/neck will rotate with the rotation of the camera
-- Make the lance move with the hand/arm of the knight
-- Make the feet of the knight saddle the horse
-- Add skeleton highlighting (face,body)
+- [x] Make the camera attached to the head, rotate between -45 and 45 horizontally. The head/neck will rotate with the rotation of the camera
+- [] Make the lance move with the hand/arm of the knight
+- [] Make the feet of the knight saddle the horse
+- [] Add skeleton highlighting (face,body)
 
 THEN
 

@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { setSideViewCamera, setPovCamera } from '../../../utils/cameraTransitions.jsx';
 import { initGraphics } from '../../../utils/initGraphics.jsx';
 
-// import GameState from './game-state.js';
+import GameState from '../../../game-state.js';
 
 function Cameras({
 	sceneRef,
@@ -49,16 +49,38 @@ function Cameras({
 	}, []);
 
 	useEffect(() => {
-		if (povCameraAnchorRef.current && playerRef.current && opponentRef.current) {
-			setPovCamera(
-				playerPovCameraRef.current,
-				// playerRef.current.position,
-				// opponentRef.current.position,
-				camerasInitRef.current,
-				povCameraAnchorRef.current
-				// horsesPassedRef.current
-			);
+		const scene = sceneRef.current;
+		let debugCube;
+
+		if (povCameraAnchorRef.current && playerRef.current) {
+			setPovCamera(playerPovCameraRef.current, camerasInitRef.current, povCameraAnchorRef.current);
+
+			if (GameState.debug) {
+				const cubeGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+				const cubeMaterial = new THREE.MeshBasicMaterial({
+					color: 0xff0000,
+					wireframe: true,
+				});
+				debugCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+				povCameraAnchorRef.current.add(debugCube);
+			}
+
+			const update = () => {
+				if (GameState.debug && debugCube && povCameraAnchorRef.current) {
+					debugCube.position.copy(playerPovCameraRef.current.position);
+				}
+				requestAnimationFrame(update);
+			};
+			update();
 		}
+
+		return () => {
+			if (debugCube) {
+				scene.remove(debugCube);
+				debugCube.geometry.dispose();
+				debugCube.material.dispose();
+			}
+		};
 	}, [playerPos]);
 
 	return <></>;
