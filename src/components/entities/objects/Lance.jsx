@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { getCameraForwardPlane } from '../../../utils/cameraTransitions';
 import GameState from '../../../game-state.js';
-import { useAnimator } from '../../../hooks/useAnimator.jsx';
+import { useModel } from '../../../hooks/useModel.jsx';
 
 export default function Lance({ scene, cameraRef, position, handRef }) {
 	const modelPath = '/models/lance/Lance.glb';
@@ -14,6 +14,8 @@ export default function Lance({ scene, cameraRef, position, handRef }) {
 	const baseSphereRef = useRef(null);
 	const tipSphereRef = useRef(null);
 	const coneMeshRef = useRef(null);
+
+	const isLanceLoded = useRef(false);
 
 	const hasHitThisRound = useRef(false);
 	const mousePosRef = useRef(null);
@@ -27,38 +29,33 @@ export default function Lance({ scene, cameraRef, position, handRef }) {
 	const aimVectorRef = useRef(new THREE.Vector3(0, 0, -1));
 
 	// Create the model and animator instance
-	const { model, animations, playAnimation, setMaterial, material } = useAnimator(
-		'Red Lance',
-		modelPath,
-		scene,
-		() => {
-			const baseMaterials = [
-				new THREE.MeshStandardMaterial({ color: 0xff0000 }), // Red
-				new THREE.MeshStandardMaterial({ color: 0x0000ff }), // Blue
-				new THREE.MeshStandardMaterial({ color: 0x800080 }), // Purple
-				new THREE.MeshStandardMaterial({ color: 0xffa500 }), // Orange
-				new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // Green
-				new THREE.MeshStandardMaterial({ color: 0x000000 }), // Black
-				new THREE.MeshStandardMaterial({ color: 0xffffff }), // White
-				new THREE.MeshStandardMaterial({ color: 0x3b2f2f }), // DarkWood (brown)
-				new THREE.MeshStandardMaterial({ color: 0xdeb887 }), // Wood
-			];
+	const { model, setMaterial, material } = useModel('Red Lance', modelPath, (loadedModel) => {
+		const baseMaterials = [
+			new THREE.MeshStandardMaterial({ color: 0xff0000 }), // Red
+			new THREE.MeshStandardMaterial({ color: 0x0000ff }), // Blue
+			new THREE.MeshStandardMaterial({ color: 0x800080 }), // Purple
+			new THREE.MeshStandardMaterial({ color: 0xffa500 }), // Orange
+			new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // Green
+			new THREE.MeshStandardMaterial({ color: 0x000000 }), // Black
+			new THREE.MeshStandardMaterial({ color: 0xffffff }), // White
+			new THREE.MeshStandardMaterial({ color: 0x3b2f2f }), // DarkWood (brown)
+			new THREE.MeshStandardMaterial({ color: 0xdeb887 }), // Wood
+		];
 
-			const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+		const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-			scene.traverse((child) => {
-				if (!child.isMesh) return;
+		scene.traverse((child) => {
+			if (!child.isMesh) return;
 
-				if (child.name.includes('Base')) {
-					child.material = getRandom(baseMaterials);
-				} else if (child.name.includes('Spiral')) {
-					child.material = getRandom(baseMaterials);
-				} else if (child.name.includes('Hilt')) {
-					child.material = getRandom(baseMaterials);
-				}
-			});
-		}
-	);
+			if (child.name.includes('Base')) {
+				child.material = getRandom(baseMaterials);
+			} else if (child.name.includes('Spiral')) {
+				child.material = getRandom(baseMaterials);
+			} else if (child.name.includes('Hilt')) {
+				child.material = getRandom(baseMaterials);
+			}
+		});
+	});
 
 	// Init the debug spheres
 	useEffect(() => {
@@ -69,7 +66,7 @@ export default function Lance({ scene, cameraRef, position, handRef }) {
 			baseSphereRef.current.name = '[LANCE] Base sphere';
 			scene.add(baseSphereRef.current);
 
-			geometry = new THREE.SphereGeometry(0.2, 4, 4);
+			geometry = new THREE.SphereGeometry(0.1, 4, 4);
 			material = new THREE.MeshBasicMaterial({ color: 0x883ead });
 			tipSphereRef.current = new THREE.Mesh(geometry, material);
 			tipSphereRef.current.name = '[LANCE] Tip sphere';
@@ -115,81 +112,94 @@ export default function Lance({ scene, cameraRef, position, handRef }) {
 	}, []);
 
 	useEffect(() => {
-		if (!model || !cameraRef.current || !mousePosRef.current) return;
+		if (!model || !cameraRef.current || !mousePosRef.current || !handRef.current) return;
 
-		const offset = new THREE.Vector3(0, 0.5, 0); // Small height offset
-		model.position.set(position.x, position.y - offset.y, position.z);
+		if (!isLanceLoded.current) {
+			scene.add(model);
+			isLanceLoded.current = true;
+		}
 
-		// Map mouse screen pos (-1 to 1) into a 3D world direction
+		const offset = new THREE.Vector3(0.25, 0, 0);
+		// Set the model to the hand's world position
+		const handWorldPos = new THREE.Vector3();
+		handRef.current.getWorldPosition(handWorldPos);
+		model.position.copy(handWorldPos).add(offset);
 
-		// Create a raycaster based on mousePosRef
+		// Ray from camera to mouse
 		const tempRaycaster = new THREE.Raycaster();
 		tempRaycaster.setFromCamera(mousePosRef.current, cameraRef.current);
-
-		// Use the ray's direction as where the mouse points
 		const mouseDirection = tempRaycaster.ray.direction.clone().normalize();
 
-		// Create a quaternion from model forward (+Z) to mouse direction
-		const forwardVector = new THREE.Vector3(0, 0, 1); // Assuming model points +Z originally
+		// Rotate so that -Z faces the mouse
+		const forwardVector = new THREE.Vector3(0, 0, 1); // Model forward
 		const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
 			forwardVector,
 			mouseDirection
 		);
-
-		// Set model rotation
 		model.quaternion.copy(targetQuaternion);
-	}, [position, model, cameraRef, mousePosRef.current]);
+	}, [position, model, cameraRef, mousePosRef.current, handRef]);
 
 	// Continuous update
 	useEffect(() => {
 		const update = () => {
 			requestAnimationFrame(update);
 
-			if (!cameraRef.current || !baseSphereRef.current || !tipSphereRef.current) return;
+			if (!cameraRef.current || !baseSphereRef.current || !tipSphereRef.current || !handRef.current)
+				return;
 
-			const playerPos = new THREE.Vector3(position.x, position.y, position.z);
+			const offset = new THREE.Vector3(0.25, 0, 0);
 
+			// Always get up-to-date world position of the hand
+			const handWorldPos = new THREE.Vector3();
+			handRef.current.getWorldPosition(handWorldPos);
+
+			const handWorldPosWithOffset = handWorldPos.clone().add(offset);
+
+			// Compute mouse intersection point
 			planeRef.current = getCameraForwardPlane(cameraRef.current, 50);
-
 			raycaster.setFromCamera(mouse, cameraRef.current);
 			const intersection = new THREE.Vector3();
 
 			if (raycaster.ray.intersectPlane(planeRef.current, intersection)) {
-				// Update the aimVectorRef instead of creating a new vector
-				aimVectorRef.current.subVectors(intersection, playerPos).normalize();
+				// Vector from hand to mouse hit
+				aimVectorRef.current.subVectors(intersection, handWorldPosWithOffset).normalize();
 
-				// Compute positions
-				const offset = new THREE.Vector3(0, 0.5, 0); // Height offset
-				const basePos = playerPos.clone().sub(offset);
-
-				// Use the actual mouse intersection point for tip position
-				// This directly follows the mouse cursor
-				const lanceLength = 3;
-				const tipPos = basePos
+				const lanceLength = 2.5;
+				const tipPos = handWorldPosWithOffset
 					.clone()
 					.add(aimVectorRef.current.clone().multiplyScalar(lanceLength));
 
-				// Update debug spheres
-				baseSphereRef.current.position.copy(basePos);
+				// Update lance model position + rotation
+				if (model) {
+					model.position.copy(handWorldPosWithOffset);
+					const forward = new THREE.Vector3(0, 0, 1); // model forward
+					const rotationQuat = new THREE.Quaternion().setFromUnitVectors(
+						forward,
+						aimVectorRef.current
+					);
+					model.quaternion.copy(rotationQuat);
+				}
+
+				// Debug visuals
+				baseSphereRef.current.position.copy(handWorldPosWithOffset);
 				tipSphereRef.current.position.copy(tipPos);
 
-				// Update debug ray line
 				if (GameState.debug && rayLineRef.current) {
-					const rayStart = basePos.clone();
-					const rayEnd = tipPos.clone();
 					const positions = rayLineRef.current.geometry.attributes.position.array;
-					positions[0] = rayStart.x;
-					positions[1] = rayStart.y;
-					positions[2] = rayStart.z;
-					positions[3] = rayEnd.x;
-					positions[4] = rayEnd.y;
-					positions[5] = rayEnd.z;
+					positions[0] = handWorldPosWithOffset.x;
+					positions[1] = handWorldPosWithOffset.y;
+					positions[2] = handWorldPosWithOffset.z;
+					positions[3] = tipPos.x;
+					positions[4] = tipPos.y;
+					positions[5] = tipPos.z;
 					rayLineRef.current.geometry.attributes.position.needsUpdate = true;
 				}
 
-				// Collision check
-				const lanceDirection = new THREE.Vector3().subVectors(tipPos, basePos).normalize();
-				raycaster.set(basePos, lanceDirection);
+				// 🔴 Collision ray
+				const lanceDirection = new THREE.Vector3()
+					.subVectors(tipPos, handWorldPosWithOffset)
+					.normalize();
+				raycaster.set(handWorldPos, lanceDirection);
 
 				const ignored = new Set([
 					baseSphereRef.current.uuid,
@@ -197,28 +207,16 @@ export default function Lance({ scene, cameraRef, position, handRef }) {
 					model?.uuid,
 					rayLineRef.current?.uuid,
 				]);
+				model?.traverse((child) => ignored.add(child.uuid));
 
-				if (model) {
-					model.traverse((child) => {
-						ignored.add(child.uuid);
-					});
-				}
-
-				const intersects = raycaster.intersectObjects(scene.children, true).filter((hit) => {
-					const obj = hit.object;
-
-					// Only accept if tagged as opponent
-					return obj.userData?.type === 'opponent';
-				});
+				const intersects = raycaster
+					.intersectObjects(scene.children, true)
+					.filter((hit) => hit.object.userData?.type === 'opponent');
 
 				if (intersects.length > 0 && !hasHitThisRound.current) {
 					const firstHit = intersects[0].object;
-
 					console.log('✅ Hit opponent:', firstHit.name);
-
-					hasHitThisRound.current = true; // Mark that we've already hit this round
-
-					// Optional: headshot check
+					hasHitThisRound.current = true;
 					if (firstHit.userData.part === 'head') {
 						console.log('💥 HEADSHOT!');
 					}

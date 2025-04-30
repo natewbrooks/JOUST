@@ -76,9 +76,9 @@ let mouseY = 0;
 let targetRotationX = 0;
 let targetRotationY = 0;
 
-const panSensitivity = 0.002; // Optional, but currently unused
-const maxPanAngleX = 0.8; // Horizontal (left/right) max in radians (~17°)
-const maxPanAngleY = 0.3; // Vertical (up/down) max in radians (~8.5°)
+// const panSensitivity = 0.002; // Currently unused
+const maxPanAngleX = 1; // Horizontal (left/right) max in radians // 0.8 good!
+const maxPanAngleY = 0.5; // Vertical (up/down) max in radians // 0.3 GOOD!
 
 function setupMousePanning(anchor) {
 	// Clean up any existing listeners
