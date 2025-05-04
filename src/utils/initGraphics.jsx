@@ -5,6 +5,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { PixelArtShader } from '../shaders/PixelArtShader.jsx';
 
 export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
+	scene.background = new THREE.Color('#87ceeb');
+
 	const ambient = new THREE.AmbientLight(0xffffff, 0.6);
 	scene.add(ambient);
 

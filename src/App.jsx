@@ -8,6 +8,7 @@ import Player from './components/entities/Player.jsx';
 import Opponent from './components/entities/Opponent.jsx';
 
 import GameState from './game-state.js';
+import Arena from './components/entities/environment/Arena.jsx';
 
 function App() {
 	const sceneRef = useRef(new THREE.Scene());
@@ -34,7 +35,7 @@ function App() {
 
 	// Initialize positions
 	const playerPosRef = useRef({ x: playerStartX, y: 2.5, z: -0.5 });
-	const opponentPosRef = useRef({ x: opponentStartX, y: 2.5, z: 1 });
+	const opponentPosRef = useRef({ x: opponentStartX, y: 2.5, z: 1.5 });
 
 	const [playerPos, setPlayerPos] = useState(playerPosRef.current);
 	const [opponentPos, setOpponentPos] = useState(opponentPosRef.current);
@@ -102,6 +103,10 @@ function App() {
 				camerasInitRef={camerasInitRef}
 				povCameraAnchorRef={povCameraAnchorRef}
 				playerPos={playerPos}
+			/>
+			<Arena
+				scene={sceneRef.current}
+				position={{ x: 0, y: 0, z: 0 }}
 			/>
 			<Opponent
 				scene={sceneRef.current}

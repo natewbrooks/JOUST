@@ -38,7 +38,7 @@ function Cameras({
 		);
 
 		// For a wider view to frame horses:
-		setSideViewCamera(orthoCamera, { distance: 20, height: 1.5, zoom: 75 });
+		setSideViewCamera(orthoCamera, { distance: 25, height: 4.75, zoom: 50 });
 
 		// Pass camera refs up to parent
 		sideViewCameraRef.current = orthoCamera;

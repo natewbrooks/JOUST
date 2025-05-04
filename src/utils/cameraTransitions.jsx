@@ -129,22 +129,29 @@ export const setSideViewCamera = (camera, options = {}) => {
 	if (!camera) return;
 
 	const {
-		distance = 15,
+		distance = 20,
 		height = 2,
 		zoom = 150,
 		animate = false,
 		duration = 1.5,
 		ease = 'power2.inOut',
+		flip = true,
 	} = options;
 
-	const targetPosition = { x: 0, y: height, z: distance };
-	const targetRotation = { x: 0, y: 0, z: 0 };
+	const targetPosition = {
+		x: flip ? 0 : 0,
+		y: height,
+		z: flip ? -distance : distance,
+	};
+	const targetRotation = {
+		x: 0,
+		y: flip ? Math.PI : 0, // 180 degrees in radians
+		z: 0,
+	};
 
-	// Store zoom factor on camera for handleResize to use
 	camera.userData.zoomFactor = zoom;
 
 	if (animate && camera.position) {
-		// Animate camera movement if requested
 		gsap.to(camera.position, {
 			x: targetPosition.x,
 			y: targetPosition.y,
@@ -161,11 +168,10 @@ export const setSideViewCamera = (camera, options = {}) => {
 			ease,
 		});
 
-		// If it's an orthographic camera, also animate the frustum
 		if (camera.isOrthographicCamera) {
 			const w = window.innerWidth;
 			const h = window.innerHeight;
-			const bottomHeight = h * 0.3 - 2; // Match the calculation in handleResize
+			const bottomHeight = h * 0.3 - 2;
 
 			gsap.to(camera, {
 				left: -w / zoom,
@@ -178,15 +184,13 @@ export const setSideViewCamera = (camera, options = {}) => {
 			});
 		}
 	} else {
-		// Set camera position and rotation immediately
 		camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
 		camera.rotation.set(targetRotation.x, targetRotation.y, targetRotation.z);
 
-		// If it's an orthographic camera, update frustum size
 		if (camera.isOrthographicCamera) {
 			const w = window.innerWidth;
 			const h = window.innerHeight;
-			const bottomHeight = h * 0.3 - 2; // Match the calculation in handleResize
+			const bottomHeight = h * 0.3 - 2;
 
 			camera.left = -w / zoom;
 			camera.right = w / zoom;

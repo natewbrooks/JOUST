@@ -68,7 +68,7 @@ export default function Horse({ scene, position, isPlayer, flipped = false }) {
 
 	return (
 		<div className='absolute top-4 left-4 z-80 flex flex-col gap-4 p-4 bg-black/40 text-white rounded shadow-lg max-w-sm'>
-			<h2 className='text-lg font-bold'>Animations</h2>
+			{/* <h2 className='text-lg font-bold'>Animations</h2>
 			{isPlayer && (
 				<>
 					{animationNames.map((name, i) => (
@@ -88,7 +88,7 @@ export default function Horse({ scene, position, isPlayer, flipped = false }) {
 						Randomize Material
 					</button>
 				</>
-			)}
+			)} */}
 		</div>
 	);
 }
