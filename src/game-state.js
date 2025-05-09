@@ -1,6 +1,7 @@
 // game-state instance singleton
 const GameState = (() => {
-	let debug = false;
+	let debug = true;
+	let use_shaders = false;
 	let game_started = false;
 	let round_countdown_timer = 3;
 	let can_move = false;

@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { PixelArtShader } from '../shaders/PixelArtShader.jsx';
+import GameState from '../game-state.js';
 
 export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 	scene.background = new THREE.Color('#87ceeb');
@@ -66,11 +67,11 @@ export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 		// Rest of the handleResize function remains the same
 		topComposer.setSize(w, topHeight);
 		topPixelPass.uniforms['resolution'].value.set(w, topHeight);
-		topPixelPass.uniforms['pixelSize'].value = 3.0;
+		topPixelPass.uniforms['pixelSize'].value = GameState.use_shaders ? 3.0 : 1.0;
 
 		bottomComposer.setSize(w, bottomHeight);
 		bottomPixelPass.uniforms['resolution'].value.set(w, bottomHeight);
-		bottomPixelPass.uniforms['pixelSize'].value = 3.0;
+		bottomPixelPass.uniforms['pixelSize'].value = GameState.use_shaders ? 3.0 : 1.0;
 
 		// Append overlay divs for top and bottom viewports
 		const topDiv = document.createElement('div');
