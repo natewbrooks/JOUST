@@ -1,20 +1,68 @@
 @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
 @import "tailwindcss";
 
-
 @theme {
-  --color-cream: #ede9d1;
-  --color-darkcream: #BDBAA7;
-  --color-red: #AD2C3F;
-  --color-blue: #2c62ad;
+  --color-cream: #F2D5A7;
+  --color-darkcream: #AA9678;
+  --color-red: #EB5D57;
+  --color-darkred: #BF423D;
+  --color-blue: #03838F;
+  --color-darkblue: #284861;
   --color-green: #2cad57;
-  --color-yellow: #ad982c;
+  --color-yellow: #F6A343;
+  --color-brown: #834D36;
+  --color-darkbrown: #5D3625;
   --color-tp: rgba(0, 0, 0, .1);
   --font-medieval: MedievalSharp, "cursive";
 }
 
+/* Reset and base styles
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--color-cream);
+} */
 
+/* Game container styles */
+.game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ui-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* Make interactive UI elements capture clicks */
+.ui-layer button,
+.ui-layer input,
+.ui-layer select,
+.ui-layer .interactive {
+  pointer-events: auto;
+}
+
+/* UI element styles */
 .banner {
   position: absolute;
   width: 100%;
@@ -27,28 +75,27 @@
   position: absolute;
   width: 100%;
   top: 50%;
-  height: fit-content;
   z-index: 100;
+  height: 100px;
   display: block;
 }
 
 .footer {
   position: absolute;
-  bottom: 00px;
+  bottom: 0px;
   width: 100%;
   height: fit-content;
   z-index: 100;
   display: block;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background-color: var(--color-cream);
-}
-
 #topViewport,
 #bottomViewport {
   cursor: none;
+}
+
+/* Medieval font styles */
+.font-medieval {
+  font-family: 'MedievalSharp', cursive;
+  letter-spacing: 5px;
 }

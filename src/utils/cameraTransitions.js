@@ -45,9 +45,10 @@ export const setPovCamera = (camera, isInit, anchor) => {
 
 	// Add camera to anchor
 	anchor.add(camera);
+	// console.log(camera);
 
 	// Local offset from anchor (head bone)
-	const offsetPos = new THREE.Vector3(0, 0.5, 0.25); // Above and slightly behind
+	const offsetPos = new THREE.Vector3(0, 0.65, 0); // Above and slightly behind
 	const offsetRot = new THREE.Euler(0, Math.PI, 0); // Flip 180° on Y
 
 	if (isInit) {

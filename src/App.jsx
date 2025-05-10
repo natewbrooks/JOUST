@@ -1,154 +1,103 @@
-import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import gsap from 'gsap';
-
-import Cameras from './components/entities/objects/Cameras.jsx';
-
-import Player from './components/entities/Player.jsx';
-import Opponent from './components/entities/Opponent.jsx';
-
-import GameState from './game-state.js';
-import Arena from './components/entities/environment/Arena.jsx';
+import { useEffect, useState, useRef } from 'react';
+import GameState from './game-state';
+import game from './core/Game';
+import UILayout from './ui/UILayout';
 
 function App() {
-	const sceneRef = useRef(new THREE.Scene());
-	// Camera stuff
-	const sideViewCameraRef = useRef(null); // ORTHOGRAPHIC CAMERA
-	const playerPovCameraRef = useRef(null); // PERSPECTIVE CAMERA
-	const camerasInitRef = useRef(false); // IS PLAYER POV CAMERA INITIALIZED
-	const povCameraAnchorRef = useRef(null); // The players neck bone ref
-
-	// Knight stuff
-	const playerRef = useRef(null); // PLAYER REF
-	const opponentRef = useRef(null); // Opponent REF
-
-	const [opponentMPH, setOpponentMPH] = useState(0);
 	const [playerMPH, setPlayerMPH] = useState(0);
+	const [opponentMPH, setOpponentMPH] = useState(0);
+	const [countdown, setCountdown] = useState(3);
 
-	// Animation frame reference
-	const animationFrameRef = useRef(null);
-
-	// Starting positions
-	const playerStartX = -18;
-	const opponentStartX = 18;
-	const moveSpeed = 7; // 20mph constant speed
-
-	// Initialize positions
-	const playerPosRef = useRef({ x: playerStartX, y: 2.5, z: -0.5 });
-	const opponentPosRef = useRef({ x: opponentStartX, y: 2.5, z: 1.5 });
-
-	const [playerPos, setPlayerPos] = useState(playerPosRef.current);
-	const [opponentPos, setOpponentPos] = useState(opponentPosRef.current);
-
-	const horsesPassedRef = useRef(false);
-	const hasAnimatedRef = useRef(false); // Track if the stop animation already ran
+	const containerRef = useRef(null);
 
 	useEffect(() => {
-		GameState.startRound();
+		const canvas = game.canvas;
+
+		if (containerRef.current && canvas && !containerRef.current.contains(canvas)) {
+			// Append canvas to container
+			containerRef.current.appendChild(canvas);
+
+			// Make both the container and canvas focusable
+			containerRef.current.tabIndex = 0;
+			canvas.tabIndex = 0;
+
+			// Style the canvas
+			canvas.style.position = 'fixed';
+			canvas.style.top = '0';
+			canvas.style.left = '0';
+			canvas.style.width = '100vw';
+			canvas.style.height = '100vh';
+			canvas.style.zIndex = '0';
+			canvas.style.cursor = 'none';
+
+			// Focus the container initially
+			containerRef.current.focus();
+
+			// Listen for clicks to refocus container
+			containerRef.current.addEventListener('click', () => {
+				containerRef.current.focus();
+			});
+
+			// Optional: also focus when clicking the canvas
+			canvas.addEventListener('click', () => {
+				containerRef.current.focus();
+			});
+
+			// Add a global debug log for keydown to confirm events fire
+			const debugKeydown = (e) => {
+				console.log('GLOBAL KEYDOWN:', e.code, 'Active element:', document.activeElement);
+			};
+			window.addEventListener('keydown', debugKeydown);
+
+			// Clean up listeners on unmount
+			return () => {
+				window.removeEventListener('keydown', debugKeydown);
+
+				if (containerRef.current && containerRef.current.contains(canvas)) {
+					containerRef.current.removeChild(canvas);
+				}
+
+				// game.cleanup();
+			};
+		}
 	}, []);
 
-	// Animation loop for constant speed
+	// Listen to game state updates
 	useEffect(() => {
-		let lastTime = null;
+		const unsubscribe = game.subscribe((gameState) => {
+			setPlayerMPH(gameState.playerMPH);
+			setOpponentMPH(gameState.opponentMPH);
+			setCountdown(gameState.countdown);
+		});
 
-		const animate = (timestamp) => {
-			if (!lastTime) lastTime = timestamp;
-			const deltaTime = (timestamp - lastTime) / 1000; // Convert to seconds
-			lastTime = timestamp;
+		const removeCountdownListener = GameState.on('countdown', (data) => {
+			setCountdown(data.timer);
+		});
 
-			const player = playerPosRef.current;
-			const opponent = opponentPosRef.current;
-
-			horsesPassedRef.current = player.x >= opponent.x;
-
-			// if (horsesPassedRef.current && !hasAnimatedRef.current) {
-			// do stuff
-			// }
-			// Normal movement before pass
-			if (GameState.can_move) {
-				playerPosRef.current.x += moveSpeed * deltaTime;
-				opponentPosRef.current.x -= moveSpeed * deltaTime;
-
-				setPlayerMPH(moveSpeed);
-				setOpponentMPH(moveSpeed);
-			}
-			// }
-
-			// Sync with React state (for UI + rendering children)
-			setPlayerPos({ ...player });
-			setOpponentPos({ ...opponent });
-
-			animationFrameRef.current = requestAnimationFrame(animate);
-		};
-
-		// Start the animation loop
-		animationFrameRef.current = requestAnimationFrame(animate);
-
-		// Cleanup function
 		return () => {
-			if (animationFrameRef.current) {
-				cancelAnimationFrame(animationFrameRef.current);
-			}
+			unsubscribe();
+			removeCountdownListener();
 		};
 	}, []);
 
 	return (
-		<div>
-			<Cameras
-				sceneRef={sceneRef}
-				playerRef={playerRef}
-				opponentRef={opponentRef}
-				playerPovCameraRef={playerPovCameraRef}
-				sideViewCameraRef={sideViewCameraRef}
-				camerasInitRef={camerasInitRef}
-				povCameraAnchorRef={povCameraAnchorRef}
-				playerPos={playerPos}
-			/>
-			<Arena
-				scene={sceneRef.current}
-				position={{ x: 0, y: 0, z: 0 }}
-			/>
-			<Opponent
-				scene={sceneRef.current}
-				opponentRef={opponentRef}
-				position={opponentPos}
-				team={'red'}
-				flipped={false}
-			/>
-			<Player
-				scene={sceneRef.current}
-				playerRef={playerRef}
-				cameraRef={playerPovCameraRef}
-				position={playerPos}
-				team={'blue'}
-				flipped={true}
-				povCameraAnchorRef={povCameraAnchorRef}
-			/>
-
-			<div className='banner border-b-8 border-darkcream'>
-				<div className='flex w-full justify-center space-x-8 py-2 bg-cream'>
-					<div className='font-medieval text-black font-bold text-5xl'>JOUST.</div>
-				</div>
+		<>
+			<div className='game-container'>
+				<div
+					ref={containerRef}
+					className='canvas-container'
+					style={{
+						position: 'fixed',
+						top: 0,
+						left: 0,
+						width: '100vw',
+						height: '100vh',
+						zIndex: 0,
+						outline: 'none', // Remove default focus outline
+					}}></div>
 			</div>
-
-			<div className='center-screen'>
-				<div className='w-full flex justify-center items-center'>
-					{GameState.round_countdown_timer > 0 ? (
-						<div className='text-black bg-cream w-[100px] text-center pt-2 rounded-full h-fit font-medieval text-8xl'>
-							{GameState.round_countdown_timer}
-						</div>
-					) : (
-						''
-					)}
-				</div>
-			</div>
-
-			{/* <div className='footer flex flex-col space-y-4'>
-				<div className='flex font-medieval justify-center w-full text-cream'>
-					Player: {playerMPH.toFixed(1)} MPH | Opponent: {opponentMPH.toFixed(1)} MPH
-				</div>
-			</div> */}
-		</div>
+			<UILayout />
+		</>
 	);
 }
 
