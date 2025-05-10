@@ -22,6 +22,7 @@ export class PlayerEntity {
 		this.rightHandRef = null;
 		this.leftHandRef = null;
 		this.anchorRef = null; // For POV camera
+		this.rightArmRef = null; // Added for arm pivot
 
 		// For smooth hand position updates
 		this.rightHandPosRef = new THREE.Vector3();
@@ -52,8 +53,14 @@ export class PlayerEntity {
 			this.findBones();
 
 			// Create lance and shield once bones are found
-			if (this.rightHandRef) {
-				this.lance = new LanceEntity(this.scene, this.cameraRef, this.rightHandPosRef);
+			if (this.rightHandRef && this.rightArmRef) {
+				// Pass both hand and arm references to the lance
+				this.lance = new LanceEntity(
+					this.scene,
+					this.cameraRef,
+					this.rightHandRef,
+					this.rightArmRef
+				);
 			}
 
 			if (this.leftHandRef) {
@@ -78,6 +85,10 @@ export class PlayerEntity {
 					this.rightHandRef.getWorldPosition(pos);
 					this.rightHandPosRef.copy(pos);
 					this.rightHandTargetRef.copy(pos);
+				} else if (childName.includes('armr')) {
+					// Find the upper arm bone for the pivot
+					this.rightArmRef = child;
+					console.log('Found Arm.R bone:', this.rightArmRef.name);
 				} else if (childName.includes('head')) {
 					this.anchorRef = child;
 					console.log('Found head bone:', this.anchorRef.name);

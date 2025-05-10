@@ -1,6 +1,6 @@
 // game-state.js
 const GameState = (() => {
-	let debug = false;
+	let debug = true;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;

@@ -1,13 +1,13 @@
 // core/objects/LanceEntity.js
 import * as THREE from 'three';
-import { AnimationLoader } from '../../utils/AnimationLoader';
+import { ModelLoader } from '../../utils/ModelLoader';
 import GameState from '../../game-state';
 
 export class LanceEntity {
-	constructor(scene, cameraRef, handPosition) {
+	constructor(scene, cameraRef, handRef, armRef) {
 		this.scene = scene;
 		this.cameraRef = cameraRef;
-		this.handPosition = handPosition;
+		this.handRef = handRef;
 
 		this.modelPath = '/models/lance/Lance.glb';
 		this.model = null;
@@ -36,9 +36,13 @@ export class LanceEntity {
 		this.setupMouseListeners();
 
 		// Initialize the model
-		this.animator = new AnimationLoader('Red Lance', this.modelPath, scene);
-		this.animator.load((loadedModel) => {
+		this.modelLoader = new ModelLoader('Red Lance', this.modelPath);
+		this.modelLoader.load((loadedModel) => {
 			this.model = loadedModel;
+
+			// Add the model to the hand
+			this.handRef.add(this.model);
+			this.model.position.set(0, 0.25, 0);
 
 			// Customize materials
 			this.customizeMaterials();
@@ -77,26 +81,27 @@ export class LanceEntity {
 		);
 		this.scene.add(this.tipSphere);
 
-		// Initialize position
-		if (this.handPosition) {
-			this.lastPositionRef.copy(this.handPosition);
+		// Initialize position based on hand ref world position
+		if (this.handRef) {
+			this.handRef.getWorldPosition(this.lastPositionRef).add(new THREE.Vector3(0, 1, 0.25));
+			this.previousPosition.copy(this.lastPositionRef);
 		}
 	}
 
 	customizeMaterials() {
-		// const baseMaterials = [
-		// 	new THREE.MeshStandardMaterial({ color: 0xff0000 }), // Red
-		// 	new THREE.MeshStandardMaterial({ color: 0x0000ff }), // Blue
-		// 	new THREE.MeshStandardMaterial({ color: 0x800080 }), // Purple
-		// 	new THREE.MeshStandardMaterial({ color: 0xffa500 }), // Orange
-		// 	new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // Green
-		// 	new THREE.MeshStandardMaterial({ color: 0x000000 }), // Black
-		// 	new THREE.MeshStandardMaterial({ color: 0xffffff }), // White
-		// 	new THREE.MeshStandardMaterial({ color: 0x3b2f2f }), // DarkWood (brown)
-		// 	new THREE.MeshStandardMaterial({ color: 0xdeb887 }), // Wood
-		// ];
+		const baseMaterials = [
+			new THREE.MeshStandardMaterial({ color: 0xff0000 }), // Red
+			new THREE.MeshStandardMaterial({ color: 0x0000ff }), // Blue
+			new THREE.MeshStandardMaterial({ color: 0x800080 }), // Purple
+			new THREE.MeshStandardMaterial({ color: 0xffa500 }), // Orange
+			new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // Green
+			new THREE.MeshStandardMaterial({ color: 0x000000 }), // Black
+			new THREE.MeshStandardMaterial({ color: 0xffffff }), // White
+			new THREE.MeshStandardMaterial({ color: 0x3b2f2f }), // DarkWood (brown)
+			new THREE.MeshStandardMaterial({ color: 0xdeb887 }), // Wood
+		];
 
-		// const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+		const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 		this.model.traverse((child) => {
 			if (!child.isMesh) return;
@@ -148,15 +153,10 @@ export class LanceEntity {
 		this.previousPosition.copy(this.lastPositionRef);
 	}
 
-	update(deltaTime, position) {
-		// Update position from parent
-		if (position) {
-			this.lastPositionRef.copy(position);
-
-			// Update model position
-			if (this.model) {
-				this.model.position.copy(position);
-			}
+	update(deltaTime) {
+		// Get the current world position of the hand
+		if (this.handRef) {
+			this.handRef.getWorldPosition(this.lastPositionRef);
 		}
 
 		// Calculate current speed
@@ -172,12 +172,17 @@ export class LanceEntity {
 		}
 
 		// Skip if critical components aren't ready
-		if (!this.model || !this.cameraRef || !this.raycaster) return;
+		if (!this.model || !this.cameraRef || !this.raycaster || !this.handRef) return;
 
 		// Only handle mouse aiming if we have a mouse position
 		if (this.mousePosRef) {
-			// Use hand position as raycaster origin
-			const handWorldPos = this.lastPositionRef.clone();
+			// Use hand world position as raycaster origin
+			const offset = new THREE.Vector3(0, 0.25, 0);
+			const handWorldPos = this.lastPositionRef
+				.clone()
+				.add(
+					offset.clone().applyQuaternion(this.handRef.getWorldQuaternion(new THREE.Quaternion()))
+				);
 
 			// Create raycaster from hand through mouse point
 			const mouseNDC = this.mousePosRef.clone();
@@ -187,15 +192,26 @@ export class LanceEntity {
 			const rayDirection = this.raycaster.ray.direction.clone().normalize();
 			this.raycaster.set(handWorldPos, rayDirection);
 
-			// Aim the model
-			const forwardVector = new THREE.Vector3(0, 0, 1);
-			const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
-				forwardVector,
-				rayDirection
-			);
-			this.model.quaternion.copy(targetQuaternion);
+			// Aim the model (reset to identity first to avoid accumulated rotations)
+			const handRotation = new THREE.Quaternion();
+			this.handRef.getWorldQuaternion(handRotation);
 
-			// Calculate ray end point
+			// Convert ray direction to local space of the hand
+			const localDirection = rayDirection.clone();
+			const inverseHandRotation = handRotation.clone().invert();
+			localDirection.applyQuaternion(inverseHandRotation);
+
+			// Create rotation for the lance in local space
+			const forwardVector = new THREE.Vector3(0, 0, 1);
+			const localQuaternion = new THREE.Quaternion().setFromUnitVectors(
+				forwardVector,
+				localDirection
+			);
+
+			// Apply the rotation to the model
+			this.model.quaternion.copy(localQuaternion);
+
+			// Calculate ray end point in world space
 			const rayLength = 2.5;
 			const rayEnd = handWorldPos.clone().add(rayDirection.clone().multiplyScalar(rayLength));
 			this.raycaster.far = rayLength;
@@ -245,6 +261,11 @@ export class LanceEntity {
 				const ignored = new Set();
 				if (this.model) {
 					this.model.traverse((child) => {
+						ignored.add(child.uuid);
+					});
+				}
+				if (this.handRef) {
+					this.handRef.traverse((child) => {
 						ignored.add(child.uuid);
 					});
 				}
@@ -343,6 +364,15 @@ export class LanceEntity {
 			this.removeMouseListener();
 		}
 
+		// Remove model from hand/scene
+		if (this.model) {
+			if (this.handRef && this.handRef.children.includes(this.model)) {
+				this.handRef.remove(this.model);
+			} else {
+				this.scene.remove(this.model);
+			}
+		}
+
 		// Remove debug elements
 		if (this.rayLine) {
 			this.scene.remove(this.rayLine);
@@ -358,7 +388,6 @@ export class LanceEntity {
 			this.tipSphere = null;
 		}
 
-		// Clean up animator
-		this.animator.dispose();
+		// ModelLoader doesn't need dispose method as it doesn't have animation-related resources
 	}
 }
