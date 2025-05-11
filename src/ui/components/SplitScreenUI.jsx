@@ -99,8 +99,8 @@ function SplitScreenUI() {
 	const totalBouts = GameState.getTotalBouts();
 
 	return (
-		<>
-			<div className='absolute w-full h-[200px] top-35 '>
+		<div className={`absolute w-full h-full top-[65%]`}>
+			<div className='w-full h-[200px]'>
 				<div
 					className={`w-fit flex flex-col justify-center items-start -top-16 -left-10 absolute z-50`}>
 					<img
@@ -108,21 +108,9 @@ function SplitScreenUI() {
 						className={`scale-80`}
 						alt={`Blue Team Banner`}
 					/>
-					<div className={`flex space-x-4 w-fit relative -top-2 -right-18 z-50`}>
+					<div className={`flex space-x-4 w-fit relative -right-18 z-50`}>
 						{generatePennantPegs('blue', totalBouts)}
 					</div>
-				</div>
-
-				<div className={`w-full flex justify-center top-3 absolute`}>
-					<TextBold
-						text={blueScore}
-						className={`text-darkbrown text-[42px]`}
-					/>
-					<CrossedLances />
-					<TextBold
-						text={redScore}
-						className={`text-darkbrown text-[42px]`}
-					/>
 				</div>
 
 				<div
@@ -131,18 +119,31 @@ function SplitScreenUI() {
 						src={'/ui/RedTeamBanner.png'}
 						className={`scale-80`}
 					/>
-					<div className={`flex space-x-4 w-fit relative -top-2 -left-18 z-50`}>
+					<div className={`flex space-x-4 w-fit relative -left-18 z-50`}>
 						{generatePennantPegs('red', totalBouts)}
 					</div>
 				</div>
 
-				<img
-					src={'/ui/WoodenBeam.png'}
-					className='absolute scale-x-105 scale-y-150 lg:scale-y-100 w-full z-0'
-					alt='Beam'
-				/>
+				<div className={`absolute w-full flex  items-center justify-center h-fit`}>
+					<img
+						src={'/ui/WoodenBeam.png'}
+						className='relative scale-x-105 w-full z-0 h-[100px]'
+						alt='Beam'
+					/>
+					<div className={`absolute w-full flex justify-center items-center h-full`}>
+						<TextBold
+							text={blueScore}
+							className={`text-darkbrown text-[42px]`}
+						/>
+						<CrossedLances />
+						<TextBold
+							text={redScore}
+							className={`text-darkbrown text-[42px]`}
+						/>
+					</div>
+				</div>
 			</div>
-		</>
+		</div>
 	);
 }
 

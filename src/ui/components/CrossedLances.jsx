@@ -4,7 +4,7 @@ import TextBold from './TextBold';
 function CrossedLances() {
 	return (
 		<>
-			<div className={`w-[120px] h-[120px] relative -top-10  z-50`}>
+			<div className={`w-[120px] h-[120px] relative  z-50`}>
 				<img
 					src={'/ui/BlueLance.svg'}
 					className={`absolute top-0`}

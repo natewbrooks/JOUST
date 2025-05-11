@@ -97,11 +97,11 @@ function HeaderUI() {
 			<div className={`w-full relative mt-2`}>
 				<img
 					src={`/ui/ScrollBanner.png`}
-					className={`w-full absolute`}
+					className={`w-full h-[140px] absolute`}
 					alt={`Scroll Header Banner`}
 				/>
 				<div className={`w-full flex justify-center  text-center relative`}>
-					<div className={`w-fit flex space-x-6 relative mt-2`}>
+					<div className={`w-fit flex space-x-6 2xl:space-x-10 relative mt-2`}>
 						{leftShields.map((s, index) => (
 							<div
 								key={s.name}
@@ -119,9 +119,9 @@ function HeaderUI() {
 					</div>
 					<TextBold
 						text={`JOUST.`}
-						className={`mx-8 mt-1 text-black text-[42px]`}
+						className={`mx-8 mt-1 2xl:mt-2 text-black text-[42px]`}
 					/>
-					<div className={`w-fit flex space-x-6 relative mt-2`}>
+					<div className={`w-fit flex space-x-6 2xl:space-x-10 relative mt-2`}>
 						{rightShields.map((s, index) => (
 							<div
 								key={s.name}

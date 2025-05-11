@@ -40,9 +40,9 @@ function UILayout() {
 					/>
 				</div> */}
 
-				<div className='center-screen'>
-					<SplitScreenUI />
+				<SplitScreenUI />
 
+				<div className='center-screen'>
 					<div className='w-full flex justify-center items-center'>
 						{/* {countdown > 0 && (
 							<div className='text-black bg-cream w-[100px] text-center pt-2 rounded-full h-fit font-medieval text-8xl'>

@@ -65,9 +65,9 @@ Create a 3D jousting game in the browser with pixelated visuals, side-scrolling 
 
 ### Visuals and Animation
 
-- [ ] Pixelation shader for retro aesthetic
+- [x] Pixelation shader for retro aesthetic
 - [ ] Animated spectators in red and blue
-- [ ] Red/blue team color markers (bandanas and lance stripes)
+- [x] Red/blue team color markers (bandanas and lance stripes)
 - [ ] Dismount and collision animations
 
 ### UI and Feedback
@@ -93,7 +93,7 @@ Create a 3D jousting game in the browser with pixelated visuals, side-scrolling 
 - [ ] Dialogue and story mode with rise-to-noble arc
 
 - [x] Make the camera attached to the head, rotate between -45 and 45 horizontally. The head/neck will rotate with the rotation of the camera
-- [] Make the lance move with the hand/arm of the knight
+- [x] Make the lance move with the hand/arm of the knight
 - [] Make the feet of the knight saddle the horse
 - [] Add skeleton highlighting (face,body)
 
