@@ -2,10 +2,13 @@
 import * as THREE from 'three';
 import { setSideViewCamera, setPovCamera, cleanupPovCamera } from '../../utils/cameraTransitions';
 import GameState from '../../game-state';
+import gsap from 'gsap';
 
 export class CameraManager {
 	constructor(scene) {
 		this.scene = scene;
+
+		this.passedHalfway = false;
 
 		// Create cameras
 		this.playerPovCamera = new THREE.PerspectiveCamera(
@@ -75,6 +78,15 @@ export class CameraManager {
 		console.log('Side view camera position:', this.sideViewCamera.position);
 		console.log('POV camera position:', this.playerPovCamera.position);
 		console.log('Debug camera position:', this.debugCamera.position);
+
+		GameState.on('pointsChanged', () => {
+			gsap.to(this.sideViewCamera, {
+				zoom: 1,
+				duration: 0.5,
+				ease: 'power2.out',
+				onUpdate: () => this.sideViewCamera.updateProjectionMatrix(),
+			});
+		});
 
 		// Make sure side camera is looking at the center of the scene
 		// this.sideViewCamera.lookAt(0, 0, 0);
@@ -168,10 +180,52 @@ export class CameraManager {
 		// }
 	}
 
+	updateSideViewCamera(deltaTime, playerModel) {
+		if (!this.camerasInitRef || !playerModel) return;
+
+		const playerX = playerModel.position.x;
+		const playerToOrigin = Math.abs(playerX);
+
+		// Define target states based on proximity
+		const isClose =
+			playerToOrigin <= GameState.movementOptions.nearHalfwayDistance && !this.passedHalfway;
+
+		const targetZoom = isClose ? 4 : 1;
+		const targetY = isClose ? 2.5 : 4;
+		const zoomDuration = isClose ? 8 : 0.5;
+		const yDuration = isClose ? 5 : 0.5;
+
+		if (playerToOrigin <= 0.05) {
+			this.passedHalfway = true;
+		}
+
+		if (this.sideViewCamera.zoom !== targetZoom) {
+			// Only animate if values actually need to change
+			gsap.to(this.sideViewCamera, {
+				zoom: targetZoom,
+				duration: zoomDuration,
+				ease: 'power2.out',
+				onUpdate: () => this.sideViewCamera.updateProjectionMatrix(),
+			});
+		}
+
+		if (this.sideViewCamera.position.y !== targetY) {
+			gsap.to(this.sideViewCamera.position, {
+				y: targetY,
+				duration: yDuration,
+				ease: 'power2.out',
+			});
+		}
+	}
+
 	update(deltaTime, playerModel) {
 		// Update debug camera movement if active
 		if (this.isDebugCameraActive) {
 			this.updateDebugCamera(deltaTime);
+		}
+
+		if (this.sideViewCamera) {
+			this.updateSideViewCamera(deltaTime, playerModel);
 		}
 
 		// Update POV camera if we have a valid anchor

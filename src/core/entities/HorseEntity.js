@@ -55,6 +55,11 @@ export class HorseEntity {
 		this.animator.setMaterial(randomTexturePath, randomTextureName);
 	}
 
+	flip() {
+		this.flipped = !this.flipped;
+		this.model.rotation.set(0, this.flipped ? Math.PI / 2 : -Math.PI / 2, 0);
+	}
+
 	updatePosition() {
 		if (this.model) {
 			this.model.position.set(this.position.x, this.position.y, this.position.z);

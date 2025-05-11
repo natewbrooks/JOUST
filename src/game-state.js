@@ -1,6 +1,8 @@
+import audioManager from './utils/AudioManager';
+
 // game-state.js
 const GameState = (() => {
-	let debug = true;
+	let debug = false;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;
@@ -10,9 +12,20 @@ const GameState = (() => {
 
 	const MAX_BOUTS = 5;
 
-	let countdownInterval = null;
+	let movementOptions = {
+		moveSpeed: 7,
+		nearHalfwayDistance: 10, // how far distance you need to trigger zoom
+		nearHalfwaySpeed: 3,
+		startPosX: {
+			left: 20,
+			right: -20,
+		},
+	};
 
-	// Event listeners - added 'boutDataChanged' for all bout metadata updates
+	let countdownInterval = null;
+	let boutInProgress = false;
+
+	// Event listeners - added new events for bout management
 	const listeners = {
 		countdown: [],
 		boutStart: [],
@@ -21,6 +34,8 @@ const GameState = (() => {
 		stateChange: [],
 		pointsChanged: [],
 		boutDataChanged: [], // New event for any bout data change
+		boutCompleted: [], // When both players finish their bout
+		positionsReset: [], // When positions need to be reset for next bout
 	};
 
 	const points = {
@@ -29,6 +44,15 @@ const GameState = (() => {
 	};
 
 	const bout_metadata = {};
+
+	// Data for tracking bout completion
+	const boutCompletionData = {
+		playerReachedEnd: false,
+		opponentReachedEnd: false,
+		playerWalkedDistance: 0,
+		opponentWalkedDistance: 10,
+		requiredWalkDistance: 10,
+	};
 
 	const setBoutMetadata = (bout, team, data) => {
 		if (!bout_metadata[bout]) {
@@ -103,6 +127,8 @@ const GameState = (() => {
 	const isGameComplete = () => current_bout >= MAX_BOUTS;
 
 	const startBout = () => {
+		audioManager.stopSound('cheer');
+
 		if (isGameComplete()) {
 			notifyListeners('gameEnd', {
 				finalPoints: { ...points },
@@ -116,6 +142,10 @@ const GameState = (() => {
 		game_started = true;
 		bout_countdown_timer = 3;
 		can_move = false;
+		boutInProgress = true;
+
+		// Reset bout completion tracking
+		resetBoutCompletionData();
 
 		// Notify listeners of bout start
 		notifyListeners('boutStart', { bout: current_bout });
@@ -129,6 +159,7 @@ const GameState = (() => {
 			if (bout_countdown_timer <= 0) {
 				clearInterval(countdownInterval);
 				can_move = true;
+				// audioManager.playNeigh(0.4);
 
 				// Start the timer when countdown finishes (only for the first bout)
 				if (!game_start_time) {
@@ -141,6 +172,94 @@ const GameState = (() => {
 		}, 1000);
 	};
 
+	// New method to mark player as reached end
+	const markPlayerReachedEnd = (isPlayer = true) => {
+		if (isPlayer) {
+			boutCompletionData.playerReachedEnd = true;
+		} else {
+			boutCompletionData.opponentReachedEnd = true;
+		}
+		checkBoutCompletion();
+	};
+
+	// New method to update walk distance
+	const updateWalkDistance = (isPlayer = true, distance) => {
+		if (isPlayer) {
+			boutCompletionData.playerWalkedDistance = distance;
+		} else {
+			boutCompletionData.opponentWalkedDistance = distance;
+		}
+		checkBoutCompletion();
+	};
+
+	// Check if bout is completed
+	const checkBoutCompletion = () => {
+		if (!boutInProgress) return;
+
+		const playerWalkedEnough =
+			boutCompletionData.playerReachedEnd &&
+			boutCompletionData.playerWalkedDistance >= boutCompletionData.requiredWalkDistance;
+
+		const opponentWalkedEnough =
+			boutCompletionData.opponentReachedEnd &&
+			boutCompletionData.opponentWalkedDistance >= boutCompletionData.requiredWalkDistance;
+
+		if (playerWalkedEnough && opponentWalkedEnough) {
+			completeBout();
+		}
+	};
+
+	// Complete the bout and prepare for next one
+	const completeBout = () => {
+		console.log('Both players completed the bout, starting new bout');
+		boutInProgress = false;
+
+		// Check and set metadata for misses
+		const meta = getBoutMetadata(current_bout);
+
+		if (!meta || meta.red.pts_earned === 0) {
+			setBoutMetadata(current_bout, 'red', {
+				part_hit: 'miss',
+				pts_earned: -1,
+				mph_on_contact: -1,
+			});
+		}
+
+		if (!meta || meta.blue.pts_earned === 0) {
+			setBoutMetadata(current_bout, 'blue', {
+				part_hit: 'miss',
+				pts_earned: -1,
+				mph_on_contact: -1,
+			});
+		}
+
+		// Notify that bout is completed and positions need to be reset
+		notifyListeners('boutCompleted', {
+			bout: current_bout,
+			metadata: getBoutMetadata(current_bout),
+			nextBout: current_bout + 1,
+		});
+
+		// Notify that positions need to be reset (swapped)
+		notifyListeners('positionsReset', {
+			swap: true,
+			nextBout: current_bout + 1,
+		});
+
+		// Start next bout after a delay
+		setTimeout(() => {
+			startBout();
+		}, 500);
+	};
+
+	// Reset bout completion data
+	const resetBoutCompletionData = () => {
+		boutCompletionData.playerReachedEnd = false;
+		boutCompletionData.opponentReachedEnd = false;
+		boutCompletionData.playerWalkedDistance = 0;
+		boutCompletionData.opponentWalkedDistance = 0;
+	};
+
 	const resetGame = () => {
 		game_started = false;
 		current_bout = 0;
@@ -149,9 +268,13 @@ const GameState = (() => {
 		points.red = 0;
 		points.blue = 0;
 		bout_countdown_timer = 3;
+		boutInProgress = false;
 
 		// Clear metadata
 		Object.keys(bout_metadata).forEach((key) => delete bout_metadata[key]);
+
+		// Reset bout completion data
+		resetBoutCompletionData();
 
 		if (countdownInterval) {
 			clearInterval(countdownInterval);
@@ -193,6 +316,10 @@ const GameState = (() => {
 			notifyListeners('stateChange', { use_shaders });
 		},
 
+		get movementOptions() {
+			return movementOptions;
+		},
+
 		get game_started() {
 			return game_started;
 		},
@@ -201,6 +328,9 @@ const GameState = (() => {
 		},
 		get can_move() {
 			return can_move;
+		},
+		get boutInProgress() {
+			return boutInProgress;
 		},
 
 		// Methods
@@ -214,6 +344,13 @@ const GameState = (() => {
 		startBout,
 		resetGame,
 		on, // Event subscription method
+
+		// New bout management methods
+		markPlayerReachedEnd,
+		updateWalkDistance,
+		checkBoutCompletion,
+		completeBout,
+		resetBoutCompletionData,
 	};
 })();
 

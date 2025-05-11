@@ -1,5 +1,7 @@
 // core/Game.js
 import * as THREE from 'three';
+import gsap from 'gsap';
+
 import { PlayerEntity } from './entities/PlayerEntity';
 import { OpponentEntity } from './entities/OpponentEntity';
 import { ArenaEntity } from './entities/environment/ArenaEntity';
@@ -7,38 +9,42 @@ import { CameraManager } from './cameras/CameraManager';
 import { initGraphics } from '../utils/initGraphics';
 import GameState from '../game-state';
 
+import audioManager from '../utils/AudioManager';
+
 class Game {
 	constructor() {
 		// Initialize THREE scene
 		this.scene = new THREE.Scene();
 
 		// Starting positions
-		this.playerStartX = -18;
-		this.opponentStartX = 18;
-		this.moveSpeed = 7; // 20mph constant speed
+		this.playerStartX = GameState.movementOptions.startPosX.right;
+		this.opponentStartX = GameState.movementOptions.startPosX.left;
+		this.moveSpeed = GameState.movementOptions.moveSpeed; // 20mph constant speed
+		this.isPassedHalfway = false;
 
 		// Initialize positions
-		this.playerPos = { x: this.playerStartX, y: 2.5, z: -0.5 };
-		this.opponentPos = { x: this.opponentStartX, y: 2.5, z: 1.5 };
+		this.playerPos = { x: this.playerStartX, y: 2.5, z: 0 };
+		this.opponentPos = { x: this.opponentStartX, y: 2.5, z: 2 };
 
 		// Setup camera manager
 		this.cameraManager = new CameraManager(this.scene);
+		audioManager.attachToCamera(this.cameraManager.playerPovCamera);
 
 		// Create arena entity
 		this.arena = new ArenaEntity(this.scene, { x: 0, y: 0, z: 0 });
 
-		// Create player entity
+		// Create player entity - NOW RED TEAM
 		this.player = new PlayerEntity(
 			this.scene,
 			this.playerPos,
-			'blue',
+			'red', // Changed from 'blue' to 'red'
 			true,
 			this.cameraManager.playerPovCamera,
 			this.cameraManager.povCameraAnchorRef
 		);
 
-		// Create opponent entity
-		this.opponent = new OpponentEntity(this.scene, this.opponentPos, 'red', false);
+		// Create opponent entity - NOW BLUE TEAM (was red)
+		this.opponent = new OpponentEntity(this.scene, this.opponentPos, 'blue', false); // Changed from 'red' to 'blue'
 
 		// Game state
 		this.horsesPassedRef = false;
@@ -54,6 +60,12 @@ class Game {
 
 		// Subscribers for UI updates
 		this.subscribers = [];
+
+		// Round system state
+		this.playerSlowdownSpeed = GameState.movementOptions.nearHalfwaySpeed;
+		this.opponentSlowdownSpeed = GameState.movementOptions.nearHalfwaySpeed;
+		this.playerWalkStartX = null; // Track where player started walking out
+		this.opponentWalkStartX = null; // Track where opponent started walking out
 
 		// Initialize graphics
 		this.graphics = initGraphics(
@@ -90,17 +102,17 @@ class Game {
 				return marker;
 			};
 
-			// Player position marker (blue)
+			// Player position marker (red - changed from blue)
 			this.playerMarker = createMarker(
 				new THREE.Vector3(this.playerPos.x, this.playerPos.y, this.playerPos.z),
-				0x0000ff,
+				0xff0000, // Changed to red
 				'Player Position Marker'
 			);
 
-			// Opponent position marker (red)
+			// Opponent position marker (blue - changed from red)
 			this.opponentMarker = createMarker(
 				new THREE.Vector3(this.opponentPos.x, this.opponentPos.y, this.opponentPos.z),
-				0xff0000,
+				0x0000ff, // Changed to blue
 				'Opponent Position Marker'
 			);
 
@@ -134,77 +146,119 @@ class Game {
 			window.addEventListener('keydown', (e) => {
 				// Press 'L' to log all scene objects
 				if (e.code === 'KeyL') {
-					// this.logSceneObjects();
 					console.log('KEY L PRESSED');
 				}
 			});
 		};
 
 		if (GameState.debug) {
-			// Create a debug info div
-			const debugInfo = document.createElement('div');
-			debugInfo.id = 'debug-info';
-			debugInfo.style.position = 'absolute';
-			debugInfo.style.top = '10px';
-			debugInfo.style.left = '10px';
-			debugInfo.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-			debugInfo.style.color = 'white';
-			debugInfo.style.padding = '10px';
-			debugInfo.style.fontFamily = 'monospace';
-			debugInfo.style.fontSize = '12px';
-			debugInfo.style.zIndex = '1000';
-			debugInfo.style.pointerEvents = 'none'; // Don't block mouse events
-			debugInfo.innerHTML =
-				'DEBUG MODE: Arrow keys = rotate, WASD = move, Q/E = down/up, Tab = toggle camera';
-			document.body.appendChild(debugInfo);
-
-			// Create position display
-			const positionDisplay = document.createElement('div');
-			positionDisplay.id = 'position-display';
-			positionDisplay.style.position = 'absolute';
-			positionDisplay.style.bottom = '10px';
-			positionDisplay.style.left = '10px';
-			positionDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-			positionDisplay.style.color = 'white';
-			positionDisplay.style.padding = '10px';
-			positionDisplay.style.fontFamily = 'monospace';
-			positionDisplay.style.fontSize = '12px';
-			positionDisplay.style.zIndex = '1000';
-			positionDisplay.style.pointerEvents = 'none';
-			document.body.appendChild(positionDisplay);
-
-			// Update position display in animation loop
-			setInterval(() => {
-				if (this.cameraManager.isDebugCameraActive && this.cameraManager.debugCamera) {
-					const pos = this.cameraManager.debugCamera.position;
-					const rot = this.cameraManager.debugCamera.rotation;
-					positionDisplay.innerHTML =
-						`Pos: ${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}<br>` +
-						`Rot: ${((rot.x * 180) / Math.PI).toFixed(2)}°, ${((rot.y * 180) / Math.PI).toFixed(
-							2
-						)}°, ${((rot.z * 180) / Math.PI).toFixed(2)}°`;
-				} else {
-					positionDisplay.innerHTML = 'Debug camera inactive';
-				}
-			}, 100);
-		}
-
-		if (GameState.debug) {
+			// Create debug info and position display divs
+			this.createDebugUI();
 			this.createDebugHelpers();
-
-			// // Log initial positions
-			// setTimeout(() => {
-			// 	console.log('Initial Positions:');
-			// 	this.logSceneObjects();
-			// }, 2000); // Wait for models to load
 		}
 
 		// Store canvas element
 		this.canvas = this.graphics.canvas;
 
+		// Store initial start positions for easy reference
+		this.leftStartX = GameState.movementOptions.startPosX.left;
+		this.rightStartX = GameState.movementOptions.startPosX.right;
+
+		// Set up event listeners for GameState events
+		this.setupGameStateListeners();
+
+		// Immediately load all audio files
+		const audioFiles = {
+			bg: 'music/WildBoarInn.mp3',
+			ouch: 'Ouch.mp3', // Loads from /audio/Ouch.mp3
+			cheer: 'Cheer.mp3', // Loads from /audio/Cheer.mp3
+			headshot: 'AnvilHit.mp3',
+			neigh: 'HorseNeigh.mp3',
+		};
+
+		audioManager.loadAll(audioFiles).then(() => {
+			// If audio is already initialized (rare), play immediately
+			if (audioManager.isAudioInitialized()) {
+				audioManager.playMusic('bg', { volume: 0.35 });
+			} else {
+				// Queue music to play after user interaction
+				audioManager.playMusic('bg', { volume: 0.35 });
+			}
+		});
+
 		// Start game
 		GameState.startBout();
 		this.start();
+	}
+
+	// Set up event listeners for GameState events
+	setupGameStateListeners() {
+		// Listen for when we need to reset positions (swap)
+		GameState.on('positionsReset', (data) => {
+			if (data.swap) {
+				this.swapZPositionsAndFlip();
+			}
+		});
+
+		// Listen for bout completion
+		GameState.on('boutCompleted', (data) => {
+			console.log('Bout completed, preparing for next bout:', data.bout);
+		});
+
+		// Listen for game end
+		GameState.on('gameEnd', (data) => {
+			console.log('Game completed!', data);
+			// You can add game end logic here
+		});
+	}
+
+	createDebugUI() {
+		// Create a debug info div
+		const debugInfo = document.createElement('div');
+		debugInfo.id = 'debug-info';
+		debugInfo.style.position = 'absolute';
+		debugInfo.style.top = '10px';
+		debugInfo.style.left = '10px';
+		debugInfo.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+		debugInfo.style.color = 'white';
+		debugInfo.style.padding = '10px';
+		debugInfo.style.fontFamily = 'monospace';
+		debugInfo.style.fontSize = '12px';
+		debugInfo.style.zIndex = '1000';
+		debugInfo.style.pointerEvents = 'none'; // Don't block mouse events
+		debugInfo.innerHTML =
+			'DEBUG MODE: Arrow keys = rotate, WASD = move, Q/E = down/up, Tab = toggle camera';
+		document.body.appendChild(debugInfo);
+
+		// Create position display
+		const positionDisplay = document.createElement('div');
+		positionDisplay.id = 'position-display';
+		positionDisplay.style.position = 'absolute';
+		positionDisplay.style.bottom = '10px';
+		positionDisplay.style.left = '10px';
+		positionDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+		positionDisplay.style.color = 'white';
+		positionDisplay.style.padding = '10px';
+		positionDisplay.style.fontFamily = 'monospace';
+		positionDisplay.style.fontSize = '12px';
+		positionDisplay.style.zIndex = '1000';
+		positionDisplay.style.pointerEvents = 'none';
+		document.body.appendChild(positionDisplay);
+
+		// Update position display in animation loop
+		setInterval(() => {
+			if (this.cameraManager.isDebugCameraActive && this.cameraManager.debugCamera) {
+				const pos = this.cameraManager.debugCamera.position;
+				const rot = this.cameraManager.debugCamera.rotation;
+				positionDisplay.innerHTML =
+					`Pos: ${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}<br>` +
+					`Rot: ${((rot.x * 180) / Math.PI).toFixed(2)}°, ${((rot.y * 180) / Math.PI).toFixed(
+						2
+					)}°, ${((rot.z * 180) / Math.PI).toFixed(2)}°`;
+			} else {
+				positionDisplay.innerHTML = 'Debug camera inactive';
+			}
+		}, 100);
 	}
 
 	start() {
@@ -248,6 +302,139 @@ class Game {
 		this.subscribers = [];
 	}
 
+	checkRoundPositions(deltaTime) {
+		// --- IDLE STATE ---
+		if (!GameState.can_move) {
+			if (this.player.horse.currentAnimation !== 'Idle') {
+				this.player.horse.playAnimation('Idle');
+			}
+			if (this.opponent.horse.currentAnimation !== 'Idle') {
+				this.opponent.horse.playAnimation('Idle');
+			}
+			return;
+		}
+
+		// --- MOVEMENT SETUP ---
+		const playerMovingLeft = this.playerStartX > this.opponentStartX;
+		const playerDirection = playerMovingLeft ? -1 : 1;
+
+		const opponentMovingLeft = this.opponentStartX > this.playerStartX;
+		const opponentDirection = opponentMovingLeft ? -1 : 1;
+
+		const playerTargetX = this.opponentStartX;
+		const opponentTargetX = this.playerStartX;
+
+		const playerReachedOppositeEnd = playerMovingLeft
+			? this.playerPos.x <= playerTargetX + 0.5
+			: this.playerPos.x >= playerTargetX - 0.5;
+
+		const opponentReachedOppositeEnd = opponentMovingLeft
+			? this.opponentPos.x <= opponentTargetX + 0.5
+			: this.opponentPos.x >= opponentTargetX - 0.5;
+
+		// --- MARK AS REACHED END & SET WALK START ---
+		if (playerReachedOppositeEnd && this.playerWalkStartX === null) {
+			this.playerWalkStartX = this.playerPos.x;
+			GameState.markPlayerReachedEnd(true);
+		}
+		if (opponentReachedOppositeEnd && this.opponentWalkStartX === null) {
+			this.opponentWalkStartX = this.opponentPos.x;
+			GameState.markPlayerReachedEnd(false);
+		}
+
+		// --- PLAYER MOVEMENT ---
+		if (this.playerWalkStartX === null) {
+			this.playerPos.x += this.moveSpeed * deltaTime * playerDirection;
+		} else {
+			this.playerPos.x += this.playerSlowdownSpeed * deltaTime * playerDirection;
+			const walkDist = Math.abs(this.playerPos.x - this.playerWalkStartX);
+			GameState.updateWalkDistance(true, walkDist);
+		}
+
+		// --- OPPONENT MOVEMENT ---
+		if (this.opponentWalkStartX === null) {
+			this.opponentPos.x += this.moveSpeed * deltaTime * opponentDirection;
+		} else {
+			this.opponentPos.x += this.opponentSlowdownSpeed * deltaTime * opponentDirection;
+			const walkDist = Math.abs(this.opponentPos.x - this.opponentWalkStartX);
+			GameState.updateWalkDistance(false, walkDist);
+		}
+
+		// --- ANIMATION STATE ---
+		if (this.playerWalkStartX !== null) {
+			if (this.player.horse.currentAnimation !== 'Walk') {
+				this.player.horse.playAnimation('Walk');
+			}
+		} else {
+			if (this.player.horse.currentAnimation !== 'Run') {
+				this.player.horse.playAnimation('Run');
+			}
+		}
+
+		if (this.opponentWalkStartX !== null) {
+			if (this.opponent.horse.currentAnimation !== 'Walk') {
+				this.opponent.horse.playAnimation('Walk');
+			}
+		} else {
+			if (this.opponent.horse.currentAnimation !== 'Run') {
+				this.opponent.horse.playAnimation('Run');
+			}
+		}
+	}
+
+	// Reset bout state for new bout
+	resetBoutState() {
+		this.playerWalkStartX = null;
+		this.opponentWalkStartX = null;
+		this.playerSlowdownSpeed = this.moveSpeed;
+		this.opponentSlowdownSpeed = this.moveSpeed;
+		this.isPassedHalfway = false;
+		this.player.horse.playAnimation('Idle');
+		this.opponent.horse.playAnimation('Idle');
+	}
+
+	swapZPositionsAndFlip() {
+		// Reset bout state
+		this.resetBoutState();
+
+		// Store current Z positions
+		const playerCurrentZ = this.playerPos.z;
+		const opponentCurrentZ = this.opponentPos.z;
+
+		// Store current starting X positions
+		const playerCurrentStartX = this.playerStartX;
+		const opponentCurrentStartX = this.opponentStartX;
+
+		// Swap starting X positions
+		this.playerStartX = opponentCurrentStartX;
+		this.opponentStartX = playerCurrentStartX;
+
+		// Set actual X positions to the new starting positions (snap/teleport)
+		this.playerPos.x = this.playerStartX;
+		this.opponentPos.x = this.opponentStartX;
+
+		// Swap Z positions
+		this.playerPos.z = opponentCurrentZ;
+		this.opponentPos.z = playerCurrentZ;
+
+		// Flip both entities
+		if (this.player) {
+			this.player.flip();
+		}
+		if (this.opponent) {
+			this.opponent.flip();
+		}
+
+		console.log('Swapped positions and flipped sprites:', {
+			playerStartX: this.playerStartX,
+			opponentStartX: this.opponentStartX,
+			playerPos: { x: this.playerPos.x, z: this.playerPos.z },
+			opponentPos: { x: this.opponentPos.x, z: this.opponentPos.z },
+			playerFlipped: this.player?.flipped,
+			opponentFlipped: this.opponent?.flipped,
+		});
+	}
+
 	animate(timestamp) {
 		if (!this.lastTime) this.lastTime = timestamp;
 		const deltaTime = (timestamp - this.lastTime) / 1000; // Convert to seconds
@@ -256,11 +443,7 @@ class Game {
 		// Check if horses passed
 		this.horsesPassedRef = this.playerPos.x >= this.opponentPos.x;
 
-		// Move characters if allowed
-		if (GameState.can_move) {
-			this.playerPos.x += this.moveSpeed * deltaTime;
-			this.opponentPos.x -= this.moveSpeed * deltaTime;
-		}
+		this.checkRoundPositions(deltaTime);
 
 		if (GameState.debug) {
 			// Update position markers
@@ -274,6 +457,31 @@ class Game {
 					this.opponentPos.z
 				);
 			}
+		}
+
+		// SLOW DOWN MOVEMENT IF DISTANCE IS CLOSE ENOUGH
+		let ppos = new THREE.Vector3(this.playerPos.x, this.playerPos.y, this.playerPos.z);
+		let opos = new THREE.Vector3(this.opponentPos.x, this.opponentPos.y, this.opponentPos.z);
+		let dist = ppos.distanceTo(opos);
+
+		// Use GSAP to smoothly animate the moveSpeed change
+		if (
+			dist < GameState.movementOptions.nearHalfwayDistance &&
+			GameState.getBoutMetadata(GameState.getBout()) === null
+		) {
+			// Smoothly transition to slow speed
+			gsap.to(this, {
+				moveSpeed: GameState.movementOptions.nearHalfwaySpeed,
+				duration: 0.4,
+				ease: 'power2.out',
+			});
+		} else {
+			// Smoothly transition to normal speed
+			gsap.to(this, {
+				moveSpeed: GameState.movementOptions.moveSpeed,
+				duration: 1,
+				ease: 'power2.out',
+			});
 		}
 
 		// Update entities
@@ -312,7 +520,7 @@ class Game {
 			opponentPos: { ...this.opponentPos },
 			playerMPH: this.moveSpeed,
 			opponentMPH: this.moveSpeed,
-			countdown: GameState.round_countdown_timer,
+			countdown: GameState.bout_countdown_timer,
 			canMove: GameState.can_move,
 		};
 

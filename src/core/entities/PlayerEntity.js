@@ -28,6 +28,9 @@ export class PlayerEntity {
 		this.rightHandPosRef = new THREE.Vector3();
 		this.rightHandTargetRef = new THREE.Vector3();
 
+		// Combat state
+		this.hasHitThisRound = false;
+
 		// Child entities
 		this.horse = new HorseEntity(
 			scene,
@@ -45,30 +48,50 @@ export class PlayerEntity {
 		this.animator.load((loadedModel) => {
 			this.model = loadedModel;
 
+			// Mark this model as belonging to this team
+			this.model.userData.type = this.team;
+
 			// Set initial rotation and position
 			this.model.rotation.set(0, this.flipped ? Math.PI / 2 : -Math.PI / 2, 0);
 			this.updatePosition();
 
 			// Find important bones
 			this.findBones();
-
-			// Create lance and shield once bones are found
-			if (this.rightHandRef && this.rightArmRef) {
-				// Pass both hand and arm references to the lance
-				this.lance = new LanceEntity(
-					this.scene,
-					this.cameraRef,
-					this.rightHandRef,
-					this.rightArmRef
-				);
-			}
-
-			if (this.leftHandRef) {
-				this.shield = new ShieldEntity(this.leftHandRef);
-			}
 		});
 
+		// Subscribe to bout events to reset hit state
+		this.setupGameStateListeners();
+
 		console.log(this.position);
+	}
+
+	setupGameStateListeners() {
+		// Reset hit state when new bout starts
+		GameState.on('boutStart', (data) => {
+			this.resetHitState();
+		});
+	}
+
+	// Reset combat state for new round
+	resetHitState() {
+		this.hasHitThisRound = false;
+		console.log(`${this.team} player: Reset hit state for bout ${GameState.getBout()}`);
+
+		// If lance has a reset method, call it
+		if (this.lance && this.lance.reset) {
+			this.lance.reset();
+		}
+	}
+
+	// Method to register a hit
+	registerHit(hitData) {
+		if (!this.hasHitThisRound) {
+			this.hasHitThisRound = true;
+			console.log(`${this.team} player: Registered hit this round`);
+
+			// Report hit to GameState
+			GameState.setBoutMetadata(GameState.getBout(), this.team, hitData);
+		}
 	}
 
 	findBones() {
@@ -103,6 +126,28 @@ export class PlayerEntity {
 				}
 			}
 		});
+
+		// Create lance and shield once bones are found
+		if (this.rightHandRef && this.rightArmRef) {
+			// Pass this entity as the owner to the lance
+			this.lance = new LanceEntity(
+				this.scene,
+				this.cameraRef,
+				this.rightHandRef,
+				this.rightArmRef,
+				this // Pass this entity as the owner
+			);
+		}
+
+		if (this.leftHandRef) {
+			this.shield = new ShieldEntity(this.leftHandRef);
+		}
+	}
+
+	flip() {
+		this.flipped = !this.flipped;
+		this.model.rotation.set(0, this.flipped ? Math.PI / 2 : -Math.PI / 2, 0);
+		this.horse.flip();
 	}
 
 	updatePosition() {
@@ -112,12 +157,12 @@ export class PlayerEntity {
 
 			// Log the model position for debugging
 			if (GameState.debug && Math.random() < 0.01) {
-				console.log('Player model position:', this.model.position);
+				// console.log('Player model position:', this.model.position);
 
 				// Get world position
 				const worldPos = new THREE.Vector3();
 				this.model.getWorldPosition(worldPos);
-				console.log('Player world position:', worldPos);
+				// console.log('Player world position:', worldPos);
 			}
 		}
 	}

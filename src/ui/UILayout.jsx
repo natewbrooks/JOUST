@@ -11,8 +11,15 @@ function UILayout() {
 				style={{ zIndex: 100 }}>
 				<HeaderUI />
 
-				<div className='absolute top-0 h-full z-50'>
+				<div className='absolute top-0 h-full'>
 					<div className={`bg-black h-full w-[30px]`}>{`  `}</div>
+					{/* <div className={`h-full flex justify-around w-[50px]`}>
+						<img
+							src={`/ui/shields/side/BearSideShield.png`}
+							alt={`Bear Side Shield 1`}
+							className={`z-80  bottom-0`}
+						/>
+					</div> */}
 				</div>
 				<div className='absolute top-0 right-0 h-full z-50'>
 					<div className={`bg-black h-full w-[30px]`}>{`  `}</div>

@@ -2,24 +2,45 @@
 import * as THREE from 'three';
 import { ModelLoader } from '../../utils/ModelLoader';
 import GameState from '../../game-state';
+import audioManager from '../../utils/AudioManager';
 
 export class LanceEntity {
-	constructor(scene, cameraRef, handRef, armRef) {
+	constructor(scene, cameraRef, handRef, armRef, ownerEntity = null) {
 		this.scene = scene;
 		this.cameraRef = cameraRef;
 		this.handRef = handRef;
+		this.armRef = armRef;
+		this.ownerEntity = ownerEntity; // Reference to the owning PlayerEntity/OpponentEntity
+
+		// Combat state - using consistent variable names
+		this.hasHitThisRound = false;
 
 		this.modelPath = '/models/lance/Lance.glb';
 		this.model = null;
 
-		this.hasHitThisRound = false;
 		this.mousePosRef = null;
 		this.mouse = new THREE.Vector2();
 
-		// Raycasting
+		// Raycasting for hit detection
 		this.rayLine = null;
 		this.tipSphere = null;
 		this.raycaster = new THREE.Raycaster();
+
+		// Preview raycasting (longer range for highlighting)
+		this.previewRayLine = null;
+		this.previewRaycaster = new THREE.Raycaster();
+		this.previewRayLength = 10; // Much longer range for preview
+
+		// Mesh highlighting - track individual spheres
+		this.highlightedHitboxes = new Set(); // Track only highlighted hitbox spheres
+		this.originalMaterials = new Map();
+		this.highlightMaterial = new THREE.MeshBasicMaterial({
+			color: 0xffff00, // Yellow
+			transparent: true,
+			opacity: 0.8,
+			emissive: 0xffff00,
+			emissiveIntensity: 0.5,
+		});
 
 		// Flag for the update loop
 		this.isUpdating = false;
@@ -29,14 +50,14 @@ export class LanceEntity {
 		this.previousPosition = new THREE.Vector3();
 		this.currentSpeed = 0;
 
-		// Team identification - assuming this is the red team lance based on the path
-		this.team = 'red';
+		// Team identification - get from owner entity or default to red
+		this.team = ownerEntity ? ownerEntity.team : 'red';
 
 		// Initialize event listeners
 		this.setupMouseListeners();
 
 		// Initialize the model
-		this.modelLoader = new ModelLoader('Red Lance', this.modelPath);
+		this.modelLoader = new ModelLoader('Lance', this.modelPath);
 		this.modelLoader.load((loadedModel) => {
 			this.model = loadedModel;
 
@@ -44,8 +65,8 @@ export class LanceEntity {
 			this.handRef.add(this.model);
 			this.model.position.set(0, 0.25, 0);
 
-			// Customize materials
-			this.customizeMaterials();
+			// Set material based on team
+			this.setMaterialToTeam(this.team);
 
 			// Initialize debug visualization
 			this.createDebugElements();
@@ -63,14 +84,31 @@ export class LanceEntity {
 	}
 
 	createDebugElements() {
-		// Create debug line for ray
-		const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 }); // Red line
+		// Create debug line for hit detection ray (short range - RED)
+		const lineMaterial = new THREE.LineBasicMaterial({
+			color: 0xff0000, // Red line
+			linewidth: 2,
+		});
 		const points = [new THREE.Vector3(), new THREE.Vector3()];
 		const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
 		this.rayLine = new THREE.Line(lineGeometry, lineMaterial);
-		this.rayLine.name = '[DEBUG] Lance Ray Line';
+		this.rayLine.name = '[DEBUG] Lance Hit Ray';
 		this.rayLine.visible = GameState.debug;
 		this.scene.add(this.rayLine);
+
+		// Create debug line for preview ray (long range - GREEN)
+		const previewLineMaterial = new THREE.LineBasicMaterial({
+			color: 0x00ff00, // Green line
+			transparent: true,
+			opacity: 0.7,
+			linewidth: 3,
+		});
+		const previewPoints = [new THREE.Vector3(), new THREE.Vector3()];
+		const previewLineGeometry = new THREE.BufferGeometry().setFromPoints(previewPoints);
+		this.previewRayLine = new THREE.Line(previewLineGeometry, previewLineMaterial);
+		this.previewRayLine.name = '[DEBUG] Lance Preview Ray';
+		this.previewRayLine.visible = GameState.debug;
+		this.scene.add(this.previewRayLine);
 
 		// Create tip sphere for hit detection visualization
 		this.tipSphere = this.createDebugSphere(
@@ -81,11 +119,26 @@ export class LanceEntity {
 		);
 		this.scene.add(this.tipSphere);
 
+		// Create preview tip sphere (end of preview ray)
+		this.previewTipSphere = this.createDebugSphere(
+			new THREE.Vector3(),
+			0.15, // Slightly larger
+			0x0000ff, // Blue color
+			'[DEBUG] Preview Tip Sphere'
+		);
+		this.scene.add(this.previewTipSphere);
+
 		// Initialize position based on hand ref world position
 		if (this.handRef) {
 			this.handRef.getWorldPosition(this.lastPositionRef).add(new THREE.Vector3(0, 1, 0.25));
 			this.previousPosition.copy(this.lastPositionRef);
 		}
+	}
+
+	// Reset the lance state for a new round
+	reset() {
+		this.hasHitThisRound = false;
+		console.log(`Lance reset for new round (${this.team} team)`);
 	}
 
 	customizeMaterials() {
@@ -112,6 +165,29 @@ export class LanceEntity {
 				child.material = getRandom(baseMaterials);
 			} else if (child.name.includes('Hilt')) {
 				child.material = getRandom(baseMaterials);
+			}
+		});
+	}
+
+	setMaterialToTeam(team) {
+		if (team !== 'red' && team !== 'blue') return;
+
+		let material;
+
+		switch (team) {
+			case 'red':
+				material = new THREE.MeshStandardMaterial({ color: 0xbf423d });
+				break;
+			case 'blue':
+				material = new THREE.MeshStandardMaterial({ color: 0x03838f });
+				break;
+		}
+
+		this.model.traverse((child) => {
+			if (!child.isMesh) return;
+
+			if (child.name.includes('Base')) {
+				child.material = material;
 			}
 		});
 	}
@@ -153,6 +229,91 @@ export class LanceEntity {
 		this.previousPosition.copy(this.lastPositionRef);
 	}
 
+	// Check if object is a hitbox sphere
+	isHitboxSphere(object) {
+		return (
+			object.isMesh &&
+			object.geometry instanceof THREE.SphereGeometry &&
+			(object.name.includes('[Hitbox]') ||
+				object.name.includes('hitbox') ||
+				object.name.includes('Hitbox') ||
+				object.userData?.isHitbox)
+		);
+	}
+
+	// Find all hitbox spheres in a given object
+	findHitboxSpheres(rootObject) {
+		const hitboxSpheres = [];
+
+		rootObject.traverse((child) => {
+			if (this.isHitboxSphere(child)) {
+				hitboxSpheres.push(child);
+			}
+		});
+
+		return hitboxSpheres;
+	}
+
+	// Highlight only the specified hitbox spheres
+	highlightHitboxSpheres(spheres) {
+		// Create a set of spheres that should be highlighted
+		const spheresToHighlight = new Set(spheres);
+
+		// Unhighlight spheres that should no longer be highlighted
+		this.highlightedHitboxes.forEach((sphere) => {
+			if (!spheresToHighlight.has(sphere)) {
+				this.unhighlightSphere(sphere);
+			}
+		});
+
+		// Highlight new spheres
+		spheres.forEach((sphere) => {
+			if (!this.highlightedHitboxes.has(sphere)) {
+				this.highlightSphere(sphere);
+			}
+		});
+	}
+
+	highlightSphere(sphere) {
+		// Add to highlighted set
+		this.highlightedHitboxes.add(sphere);
+
+		// Store original material
+		if (sphere.material) {
+			sphere.visible = true;
+
+			if (Array.isArray(sphere.material)) {
+				this.originalMaterials.set(sphere, [...sphere.material]);
+				sphere.material = new Array(sphere.material.length).fill(this.highlightMaterial);
+			} else {
+				this.originalMaterials.set(sphere, sphere.material);
+				sphere.material = this.highlightMaterial;
+			}
+		}
+
+		// console.log('🟡 Highlighted hitbox sphere:', sphere.name || 'unnamed sphere');
+	}
+
+	unhighlightSphere(sphere) {
+		// Remove from highlighted set
+		this.highlightedHitboxes.delete(sphere);
+
+		// Restore original material
+		if (this.originalMaterials.has(sphere)) {
+			sphere.material = this.originalMaterials.get(sphere);
+			sphere.visible = false;
+			this.originalMaterials.delete(sphere);
+		}
+
+		// console.log('⚪ Unhighlighted hitbox sphere:', sphere.name || 'unnamed sphere');
+	}
+
+	clearAllHighlights() {
+		this.highlightedHitboxes.forEach((sphere) => {
+			this.unhighlightSphere(sphere);
+		});
+	}
+
 	update(deltaTime) {
 		// Get the current world position of the hand
 		if (this.handRef) {
@@ -167,8 +328,16 @@ export class LanceEntity {
 			this.rayLine.visible = GameState.debug;
 		}
 
+		if (this.previewRayLine) {
+			this.previewRayLine.visible = GameState.debug;
+		}
+
 		if (this.tipSphere) {
 			this.tipSphere.visible = GameState.debug;
+		}
+
+		if (this.previewTipSphere) {
+			this.previewTipSphere.visible = GameState.debug;
 		}
 
 		// Skip if critical components aren't ready
@@ -184,13 +353,17 @@ export class LanceEntity {
 					offset.clone().applyQuaternion(this.handRef.getWorldQuaternion(new THREE.Quaternion()))
 				);
 
-			// Create raycaster from hand through mouse point
+			// Create ray direction from hand through mouse point
 			const mouseNDC = this.mousePosRef.clone();
 			this.raycaster.setFromCamera(mouseNDC, this.cameraRef);
+			this.previewRaycaster.setFromCamera(mouseNDC, this.cameraRef);
 
 			// Move ray origin to hand position but keep direction
 			const rayDirection = this.raycaster.ray.direction.clone().normalize();
+
+			// Set up both raycasters
 			this.raycaster.set(handWorldPos, rayDirection);
+			this.previewRaycaster.set(handWorldPos, rayDirection);
 
 			// Aim the model (reset to identity first to avoid accumulated rotations)
 			const handRotation = new THREE.Quaternion();
@@ -211,107 +384,145 @@ export class LanceEntity {
 			// Apply the rotation to the model
 			this.model.quaternion.copy(localQuaternion);
 
-			// Calculate ray end point in world space
-			const rayLength = 2.5;
-			const rayEnd = handWorldPos.clone().add(rayDirection.clone().multiplyScalar(rayLength));
-			this.raycaster.far = rayLength;
+			// Calculate ray end point for hit detection (short range)
+			const hitRayLength = 2.5;
+			const hitRayEnd = handWorldPos.clone().add(rayDirection.clone().multiplyScalar(hitRayLength));
+			this.raycaster.far = hitRayLength;
 
-			// Update tip sphere
+			// Calculate ray end point for preview (long range)
+			const previewRayEnd = handWorldPos
+				.clone()
+				.add(rayDirection.clone().multiplyScalar(this.previewRayLength));
+			this.previewRaycaster.far = this.previewRayLength;
+
+			// Update tip spheres
 			if (this.tipSphere) {
-				this.tipSphere.position.copy(rayEnd);
+				this.tipSphere.position.copy(hitRayEnd);
 			}
 
-			// Update debug ray line
-			if (this.rayLine) {
+			if (this.previewTipSphere) {
+				this.previewTipSphere.position.copy(previewRayEnd);
+			}
+
+			// Update debug ray lines - IMPORTANT: Update both lines
+			if (this.rayLine && GameState.debug) {
 				const positions = this.rayLine.geometry.attributes.position.array;
 				positions[0] = handWorldPos.x;
 				positions[1] = handWorldPos.y;
 				positions[2] = handWorldPos.z;
-				positions[3] = rayEnd.x;
-				positions[4] = rayEnd.y;
-				positions[5] = rayEnd.z;
+				positions[3] = hitRayEnd.x;
+				positions[4] = hitRayEnd.y;
+				positions[5] = hitRayEnd.z;
 				this.rayLine.geometry.attributes.position.needsUpdate = true;
 			}
 
-			// Check for collisions if the game is in motion
-			if (GameState.can_move) {
-				// Find potential target objects
-				const potentialTargets = [];
-				this.scene.traverse((object) => {
-					// Check for opponent objects
-					if (
-						object.userData?.type === 'opponent' ||
-						(object.parent && object.parent.userData?.type === 'opponent')
-					) {
-						potentialTargets.push(object);
-					}
+			if (this.previewRayLine && GameState.debug) {
+				const positions = this.previewRayLine.geometry.attributes.position.array;
+				positions[0] = handWorldPos.x;
+				positions[1] = handWorldPos.y;
+				positions[2] = handWorldPos.z;
+				positions[3] = previewRayEnd.x;
+				positions[4] = previewRayEnd.y;
+				positions[5] = previewRayEnd.z;
+				this.previewRayLine.geometry.attributes.position.needsUpdate = true;
+			}
 
-					// Check for opponent bones
-					if (
-						object.type === 'Bone' &&
-						object.parent &&
-						(object.parent.userData?.type === 'opponent' ||
-							(object.parent.parent && object.parent.parent.userData?.type === 'opponent'))
-					) {
-						potentialTargets.push(object);
-					}
+			// // Find potential target objects
+			const potentialTargets = [];
+			// // Find opponent team type
+			const opponentTeam = this.team === 'red' ? 'blue' : 'red';
+
+			this.scene.traverse((object) => {
+				// Check for opponent objects and their children
+				if (
+					object.userData?.type === opponentTeam ||
+					object.name.toLowerCase().includes('hitbox')
+				) {
+					potentialTargets.push(object);
+				}
+
+				// Check for opponent bones
+				// if (object.type === 'Mesh' && object.name.toLowerCase().includes('hitbox')) {
+				// 	// Look up the parent tree for opponent entity
+				// 	let currentParent = object.parent;
+				// 	while (currentParent) {
+				// 		if (currentParent.userData?.type === opponentTeam) {
+				// 			potentialTargets.push(object);
+				// 			break;
+				// 		}
+				// 		currentParent = currentParent.parent;
+				// 	}
+				// }
+			});
+
+			// Create ignore list (don't hit own parts)
+			const ignored = new Set();
+			if (this.model) {
+				this.model.traverse((child) => {
+					ignored.add(child.uuid);
 				});
+			}
+			if (this.handRef) {
+				this.handRef.traverse((child) => {
+					ignored.add(child.uuid);
+				});
+			}
+			if (this.rayLine) ignored.add(this.rayLine.uuid);
+			if (this.previewRayLine) ignored.add(this.previewRayLine.uuid);
+			if (this.tipSphere) ignored.add(this.tipSphere.uuid);
+			if (this.previewTipSphere) ignored.add(this.previewTipSphere.uuid);
 
-				// Create ignore list (don't hit own parts)
-				const ignored = new Set();
-				if (this.model) {
-					this.model.traverse((child) => {
-						ignored.add(child.uuid);
-					});
-				}
-				if (this.handRef) {
-					this.handRef.traverse((child) => {
-						ignored.add(child.uuid);
-					});
-				}
-				if (this.rayLine) ignored.add(this.rayLine.uuid);
-				if (this.tipSphere) ignored.add(this.tipSphere.uuid);
+			// Check preview intersections (long range) for highlighting
+			const previewIntersects = this.previewRaycaster
+				.intersectObjects(potentialTargets, true)
+				.filter((hit) => !ignored.has(hit.object.uuid));
 
-				// Check intersections
+			// Find only hitbox spheres that the ray intersects
+			const hitSpheres = [];
+			previewIntersects.forEach((hit) => {
+				if (this.isHitboxSphere(hit.object)) {
+					hitSpheres.push(hit.object);
+				}
+			});
+
+			// Highlight only the intersected hitbox spheres
+			this.highlightHitboxSpheres(hitSpheres);
+
+			// Check actual hit detection (short range) only if game is in motion and cooldown is over
+			if (GameState.can_move && !this.hasHitThisRound) {
 				const intersects = this.raycaster
 					.intersectObjects(potentialTargets, true)
 					.filter((hit) => !ignored.has(hit.object.uuid));
 
-				// Process hits
-				if (intersects.length > 0 && !this.hasHitThisRound) {
+				// Process actual hits
+				if (intersects.length > 0) {
 					const firstHit = intersects[0].object;
+
+					if (!firstHit.name.toLowerCase().includes('hitbox')) return;
 					console.log('✅ Hit opponent:', firstHit.name);
+					console.log(firstHit);
+					audioManager.playCheer(0.5);
+					this.hasHitThisRound = true;
 
 					// Determine body part hit
-					let bodyPart = 'body';
+					let bodyPart = 'other'; // Default to other for 1 point
 					if (firstHit.userData?.part) {
 						bodyPart = firstHit.userData.part;
-					} else if (firstHit.type === 'Bone') {
+					} else if (firstHit.type === 'Mesh') {
 						const boneName = firstHit.name.toLowerCase();
-						if (
-							boneName.includes('head') ||
-							boneName.includes('skull') ||
-							boneName.includes('neck')
-						) {
+						console.log(boneName);
+
+						// Check for headshot parts: Head and Neck = 3 points
+						if (boneName.includes('head') || boneName.includes('neck')) {
 							bodyPart = 'head';
-						} else if (
-							boneName.includes('arm') ||
-							boneName.includes('hand') ||
-							boneName.includes('shoulder')
-						) {
-							bodyPart = 'arm';
-						} else if (
-							boneName.includes('leg') ||
-							boneName.includes('foot') ||
-							boneName.includes('ankle')
-						) {
-							bodyPart = 'leg';
-						} else if (
-							boneName.includes('spine') ||
-							boneName.includes('chest') ||
-							boneName.includes('torso')
-						) {
-							bodyPart = 'torso';
+						}
+						// Check for body shot parts: Spine and Shoulder = 2 points
+						else if (boneName.includes('spine') || boneName.includes('shoulder')) {
+							bodyPart = 'body';
+						}
+						// Everything else = 1 point (other)
+						else {
+							bodyPart = 'other';
 						}
 					}
 
@@ -321,37 +532,43 @@ export class LanceEntity {
 						case 'head':
 							ptsEarned = 3;
 							console.log('💥 HEADSHOT! (+3 points)');
+							audioManager.playHeadshot(0.3);
 							break;
-						case 'torso':
 						case 'body':
 							ptsEarned = 2;
 							console.log('🎯 Body hit! (+2 points)');
 							break;
-						case 'arm':
-						case 'leg':
-							ptsEarned = 1;
-							console.log('🎯 Limb hit! (+1 point)');
-							break;
 						default:
-							ptsEarned = 2; // Default to body hit
-							console.log('🎯 Hit! (+2 points)');
+							ptsEarned = 1;
+							console.log('🎯 Hit! (+1 point)');
+							audioManager.playOuch(0.3);
+							audioManager.playNeigh(0.4);
+
 							break;
 					}
 
 					console.log(`🎯 Hit on ${bodyPart}! (${this.currentSpeed.toFixed(1)} MPH)`);
 
-					// Log metadata to GameState
-					const currentBout = GameState.getBout();
-					if (currentBout > 0) {
-						GameState.setBoutMetadata(currentBout, this.team, {
-							part_hit: bodyPart,
-							pts_earned: ptsEarned,
-							mph_on_contact: parseFloat(this.currentSpeed.toFixed(1)),
-						});
+					// Create hit data
+					const hitData = {
+						part_hit: bodyPart,
+						pts_earned: ptsEarned,
+						mph_on_contact: parseFloat(this.currentSpeed.toFixed(1)),
+					};
 
-						console.log(`📊 Bout ${currentBout} metadata logged for ${this.team} team`);
+					// Register hit through the owner entity if available
+					if (this.ownerEntity && this.ownerEntity.registerHit) {
+						this.ownerEntity.registerHit(hitData);
+					} else {
+						// Fallback to direct GameState call if no owner entity
+						const currentBout = GameState.getBout();
+						if (currentBout > 0) {
+							GameState.setBoutMetadata(currentBout, this.team, hitData);
+							console.log(`📊 Bout ${currentBout} metadata logged for ${this.team} team`);
+						}
 					}
 
+					// Set flags to prevent multiple hits
 					this.hasHitThisRound = true;
 				}
 			}
@@ -359,6 +576,15 @@ export class LanceEntity {
 	}
 
 	dispose() {
+		// Clear any highlighting before disposal
+		this.clearAllHighlights();
+
+		// Dispose of highlight material
+		if (this.highlightMaterial) {
+			this.highlightMaterial.dispose();
+			this.highlightMaterial = null;
+		}
+
 		// Remove event listeners
 		if (this.removeMouseListener) {
 			this.removeMouseListener();
@@ -381,6 +607,13 @@ export class LanceEntity {
 			this.rayLine = null;
 		}
 
+		if (this.previewRayLine) {
+			this.scene.remove(this.previewRayLine);
+			this.previewRayLine.geometry.dispose();
+			this.previewRayLine.material.dispose();
+			this.previewRayLine = null;
+		}
+
 		if (this.tipSphere) {
 			this.scene.remove(this.tipSphere);
 			this.tipSphere.geometry.dispose();
@@ -388,6 +621,14 @@ export class LanceEntity {
 			this.tipSphere = null;
 		}
 
-		// ModelLoader doesn't need dispose method as it doesn't have animation-related resources
+		if (this.previewTipSphere) {
+			this.scene.remove(this.previewTipSphere);
+			this.previewTipSphere.geometry.dispose();
+			this.previewTipSphere.material.dispose();
+			this.previewTipSphere = null;
+		}
+
+		// Clear stored materials
+		this.originalMaterials.clear();
 	}
 }
