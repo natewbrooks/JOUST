@@ -2,7 +2,7 @@ import gsap from 'gsap';
 import audioManager from './utils/AudioManager';
 
 const GameState = (() => {
-	let debug = true;
+	let debug = false;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;
@@ -20,7 +20,7 @@ const GameState = (() => {
 	};
 
 	let movementOptions = {
-		moveSpeed: 20, // 7
+		moveSpeed: 7, // 7
 		nearHalfwayDistance: 12, // how far distance you need to trigger zoom
 		timeSlowdownFactor: 0.4, // Time slows to 40% during close pass
 		horseWalkSpeed: 0.5, // Used for walking phase
@@ -46,6 +46,7 @@ const GameState = (() => {
 		boutDataChanged: [], // New event for any bout data change
 		boutCompleted: [], // When both players finish their bout
 		positionsReset: [], // When positions need to be reset for next bout
+		gameReset: [], // New event for complete game reset
 	};
 
 	const points = {
@@ -177,13 +178,11 @@ const GameState = (() => {
 			let soundFile;
 
 			if (bout_countdown_timer === 3) {
-				soundFile = 'three';
+				soundFile = 'marks';
 			} else if (bout_countdown_timer === 2) {
-				soundFile = 'two';
+				soundFile = 'ready';
 			} else if (bout_countdown_timer === 1) {
-				soundFile = 'one';
-			} else if (bout_countdown_timer === 0) {
-				soundFile = 'zero';
+				soundFile = 'joust';
 			}
 
 			// Notify listeners of countdown change
@@ -195,7 +194,7 @@ const GameState = (() => {
 				bout_countdown_timer -= 1;
 			}
 
-			if (bout_countdown_timer <= -1) {
+			if (bout_countdown_timer <= 0) {
 				clearInterval(countdownInterval);
 				can_move = true;
 				// audioManager.playNeigh(0.4);
@@ -204,6 +203,8 @@ const GameState = (() => {
 				if (!game_start_time) {
 					game_start_time = Date.now();
 				}
+
+				notifyListeners('countdown', { timer: 0, bout: current_bout });
 
 				// Notify listeners of state change
 				notifyListeners('stateChange', { can_move, bout: current_bout });
@@ -357,15 +358,29 @@ const GameState = (() => {
 	};
 
 	const resetGame = () => {
+		// Clear any active intervals
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
+		}
+
+		// Stop any ongoing sounds
+		// audioManager.pauseAllExceptMusic();
+		// Restart the background music
+
+		// Reset game state
 		game_started = false;
 		current_bout = 0;
 		game_start_time = null;
 		can_move = false;
-		points.red = 0;
-		points.blue = 0;
 		bout_countdown_timer = 3;
 		boutInProgress = false;
 		started_game_end_sequence = false;
+		paused = false;
+
+		// Reset points
+		points.red = 0;
+		points.blue = 0;
 
 		// Clear metadata
 		Object.keys(bout_metadata).forEach((key) => delete bout_metadata[key]);
@@ -373,9 +388,23 @@ const GameState = (() => {
 		// Reset bout completion data
 		resetBoutCompletionData();
 
-		if (countdownInterval) {
-			clearInterval(countdownInterval);
-		}
+		// Notify about score reset specifically
+		notifyListeners('pointsChanged', {
+			team: 'red',
+			points: 0,
+			addedPoints: 0,
+		});
+
+		notifyListeners('pointsChanged', {
+			team: 'blue',
+			points: 0,
+			addedPoints: 0,
+		});
+
+		// Notify that the game has been completely reset
+		notifyListeners('gameReset', {
+			resetComplete: true,
+		});
 	};
 
 	// Subscribe to events
@@ -474,6 +503,10 @@ const GameState = (() => {
 
 		get opponentEntity() {
 			return knights.opponent;
+		},
+
+		get knights() {
+			return knights;
 		},
 
 		// Methods

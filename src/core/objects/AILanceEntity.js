@@ -344,6 +344,67 @@ export class AILanceEntity extends LanceEntity {
 		}
 	}
 
+	reset() {
+		// Call parent class reset method first
+		super.reset();
+
+		// Reset AI-specific targeting state
+		this.timeSinceLastAimUpdate = 0;
+		this.currentAimPoint = new THREE.Vector3();
+		this.targetAimPoint = new THREE.Vector3();
+
+		// Reset preview ray visualization elements
+		if (this.previewRayLine) {
+			this.previewRayLine.visible = gameStateManager.debug;
+
+			// Reset geometry to default positions if needed
+			const positions = this.previewRayLine.geometry.attributes.position.array;
+			if (this.handRef) {
+				const handPos = new THREE.Vector3();
+				this.handRef.getWorldPosition(handPos);
+
+				// Set both ends of the line to the hand position initially
+				positions[0] = handPos.x;
+				positions[1] = handPos.y;
+				positions[2] = handPos.z;
+				positions[3] = handPos.x;
+				positions[4] = handPos.y;
+				positions[5] = handPos.z;
+
+				this.previewRayLine.geometry.attributes.position.needsUpdate = true;
+			}
+		}
+
+		if (this.previewTipSphere) {
+			this.previewTipSphere.visible = gameStateManager.debug;
+
+			// Reset to hand position
+			if (this.handRef) {
+				const handPos = new THREE.Vector3();
+				this.handRef.getWorldPosition(handPos);
+				this.previewTipSphere.position.copy(handPos);
+			}
+		}
+
+		// Reset model rotation if it exists
+		if (this.model) {
+			this.model.quaternion.identity();
+		}
+
+		// Reset arm rotation if it exists
+		if (this.armRef) {
+			// Reset to default rotation
+			this.armRef.rotation.set(0, 0, 0);
+		}
+
+		// Clear all highlighted hitboxes
+		this.highlightedHitboxes?.forEach((sphere) => {
+			this.unhighlightSphere(sphere);
+		});
+
+		console.log('AI lance reset complete');
+	}
+
 	dispose() {
 		// Clean up additional debug elements
 		if (this.previewRayLine) {

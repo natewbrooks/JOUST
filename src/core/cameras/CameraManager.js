@@ -302,6 +302,50 @@ export class CameraManager {
 		});
 	}
 
+	resetCamera() {
+		// Reset camera initialization state
+		this.horsesPassed = false;
+
+		// IMPORTANT NEW ADDITION: Reset the camerasInitRef flag
+		// This will force the POV camera to be re-initialized in the next update
+		this.camerasInitRef = false;
+
+		// Reset side view camera to initial position
+		setSideViewCamera(this.sideViewCamera, {
+			distance: 25,
+			height: 4,
+			zoom: 60,
+		});
+
+		// Reset zoom
+		this.sideViewCamera.zoom = 1;
+		this.sideViewCamera.updateProjectionMatrix();
+
+		// Clean up existing POV camera setup
+		cleanupPovCamera();
+
+		// Reset POV camera properties
+		this.playerPovCamera.position.set(0, 0, 0);
+		this.playerPovCamera.rotation.set(0, 0, 0);
+		this.playerPovCamera.fov = 100;
+		this.playerPovCamera.updateProjectionMatrix();
+
+		// If there's a valid anchor, re-initialize the POV camera immediately
+		if (this.povCameraAnchorRef && this.povCameraAnchorRef.current) {
+			// Re-initialize POV camera with the anchor
+			setPovCamera(this.playerPovCamera, false, this.povCameraAnchorRef.current);
+		}
+
+		// Reset debug camera if it exists
+		if (this.debugCamera) {
+			this.debugCamera.position.set(0, 5, -20);
+			this.debugCamera.lookAt(0, 5, 0);
+			this.isDebugCameraActive = false;
+		}
+
+		console.log('Camera reset complete - POV camera reinitialized');
+	}
+
 	setPovCameraAnchor(anchor) {
 		this.povCameraAnchorRef.current = anchor;
 

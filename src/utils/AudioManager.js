@@ -26,6 +26,9 @@ class AudioManager {
 			neigh: 'HorseNeigh.mp3',
 			boo: 'Boo.mp3',
 			woosh: 'Woosh.mp3',
+			marks: '/countdown/marks.mp3',
+			ready: '/countdown/ready.mp3',
+			joust: '/countdown/joust.mp3',
 			three: '/countdown/three.mp3',
 			two: '/countdown/two.mp3',
 			one: '/countdown/one.mp3',
@@ -58,6 +61,10 @@ class AudioManager {
 
 	isMuted() {
 		return this.muted;
+	}
+
+	isPaused() {
+		return this.paused;
 	}
 
 	async preloadDefaultAudio() {
@@ -169,7 +176,15 @@ class AudioManager {
 			sound.setRefDistance(20);
 			sound.position.copy(position);
 		}
-		sound.play();
+
+		// Start playing, unless the system is paused
+		if (!this.paused) {
+			sound.play();
+		} else {
+			// If system is paused, mark this sound as paused so it can be resumed later
+			sound._wasPaused = true;
+		}
+
 		this.sounds.set(name, sound);
 		if (!loop) sound.onEnded = () => this.sounds.delete(name);
 		return sound;
@@ -204,7 +219,14 @@ class AudioManager {
 
 		// Apply volume with scaling
 		this.bgMusic.setVolume(this.muted ? 0 : volume * this.volumeScale);
-		this.bgMusic.play();
+
+		// Start playing, unless the system is paused
+		if (!this.paused || options.ignoreSystemPause) {
+			this.bgMusic.play();
+		} else {
+			// If system is paused, mark this music as paused so it can be resumed later
+			this.bgMusic._wasPaused = true;
+		}
 	}
 
 	stopMusic() {
@@ -233,16 +255,15 @@ class AudioManager {
 
 		// Only trigger side effects if pause state changed
 		if (this.paused !== previousPaused) {
-			// notifyListeners('stateChange', {  });
-
+			// Perform the actual pause/resume actions
 			if (this.paused) {
 				if (allowMusic) {
-					audioManager.pauseAllExceptMusic();
+					this.pauseAllExceptMusic();
 				} else {
-					audioManager.pauseAll();
+					this.pauseAll();
 				}
 			} else {
-				audioManager.resumeAll();
+				this.resumeAll();
 			}
 		}
 
@@ -250,22 +271,23 @@ class AudioManager {
 	}
 
 	pauseAllExceptMusic() {
-		for (const [name, sound] of this.sounds.entries()) {
+		this.sounds.forEach((sound) => {
 			if (sound.isPlaying) {
 				sound.pause();
 				sound._wasPaused = true;
 			}
-		}
+		});
 		// Leave bgMusic playing
 	}
 
 	pauseAll() {
-		for (const [name, sound] of this.sounds.entries()) {
+		this.sounds.forEach((sound) => {
 			if (sound.isPlaying) {
 				sound.pause(); // Pause (does not reset time like .stop())
 				sound._wasPaused = true; // Track that we paused it manually
 			}
-		}
+		});
+
 		if (this.bgMusic && this.bgMusic.isPlaying) {
 			this.bgMusic.pause();
 			this.bgMusic._wasPaused = true;
@@ -273,15 +295,18 @@ class AudioManager {
 	}
 
 	resumeAll() {
-		for (const [name, sound] of this.sounds.entries()) {
-			if (sound._wasPaused) {
-				sound.play(); // Resume playback
-				sound._wasPaused = false;
+		if (!this.paused) {
+			this.sounds.forEach((sound) => {
+				if (sound._wasPaused) {
+					sound.play(); // Resume playback
+					sound._wasPaused = false;
+				}
+			});
+
+			if (this.bgMusic && this.bgMusic._wasPaused) {
+				this.bgMusic.play();
+				this.bgMusic._wasPaused = false;
 			}
-		}
-		if (this.bgMusic && this.bgMusic._wasPaused) {
-			this.bgMusic.play();
-			this.bgMusic._wasPaused = false;
 		}
 	}
 

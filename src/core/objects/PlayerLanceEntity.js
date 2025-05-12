@@ -187,6 +187,54 @@ export class PlayerLanceEntity extends LanceEntity {
 		this.highlightHitboxSpheres(hitSpheres);
 	}
 
+	reset() {
+		// Call parent class reset method first
+		super.reset();
+
+		// Reset mouse-related properties
+		this.mouse = new THREE.Vector2();
+
+		// Reset preview ray visualization elements
+		if (this.previewRayLine) {
+			this.previewRayLine.visible = gameStateManager.debug;
+
+			// Reset geometry to default positions if needed
+			const positions = this.previewRayLine.geometry.attributes.position.array;
+			if (this.handRef) {
+				const handPos = new THREE.Vector3();
+				this.handRef.getWorldPosition(handPos);
+
+				// Set both ends of the line to the hand position initially
+				positions[0] = handPos.x;
+				positions[1] = handPos.y;
+				positions[2] = handPos.z;
+				positions[3] = handPos.x;
+				positions[4] = handPos.y;
+				positions[5] = handPos.z;
+
+				this.previewRayLine.geometry.attributes.position.needsUpdate = true;
+			}
+		}
+
+		if (this.previewTipSphere) {
+			this.previewTipSphere.visible = gameStateManager.debug;
+
+			// Reset to hand position
+			if (this.handRef) {
+				const handPos = new THREE.Vector3();
+				this.handRef.getWorldPosition(handPos);
+				this.previewTipSphere.position.copy(handPos);
+			}
+		}
+
+		// Clear all highlighted hitboxes
+		this.highlightedHitboxes?.forEach((sphere) => {
+			this.unhighlightSphere(sphere);
+		});
+
+		console.log('Player lance reset complete');
+	}
+
 	dispose() {
 		// Remove player-specific event listeners
 		if (this.removeMouseListener) {

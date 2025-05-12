@@ -459,6 +459,26 @@ export class LanceEntity {
 		}
 	}
 
+	reset() {
+		this.hasHitThisRound = false;
+		this.currentSpeed = 0;
+		this.clearAllHighlights(); // Clear any highlighted hitboxes
+
+		// Reset previous position for speed calculation
+		if (this.handRef) {
+			this.handRef.getWorldPosition(this.lastPositionRef);
+			this.previousPosition.copy(this.lastPositionRef);
+		}
+
+		// Reset debug elements if they exist
+		if (this.tipSphere && this.rayLine) {
+			this.tipSphere.visible = gameStateManager.debug;
+			this.rayLine.visible = gameStateManager.debug;
+		}
+
+		console.log(`Lance reset for new round (${this.team} team)`);
+	}
+
 	dispose() {
 		// Clear any highlighting before disposal
 		this.clearAllHighlights();

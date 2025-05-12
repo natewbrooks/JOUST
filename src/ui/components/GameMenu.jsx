@@ -33,26 +33,26 @@ function GameMenu({ modalID, winner }) {
 	// Add function to resume game
 	const resumeGame = () => {
 		gameStateManager.setPause(false);
-		audioManager.setPause(false); // This line was missing - add it to unpause audio
 		handleClose();
 	};
 
-	// Add function to start a new game
 	const startNewGame = () => {
+		// Reset the game state
 		gameStateManager.resetGame();
-		gameStateManager.setPause(false);
-		audioManager.setPause(false);
-		gameStateManager.startBout();
+
+		// Close the modal first
 		handleClose();
+
+		// Use a small timeout to let the UI update before starting a new bout
+		setTimeout(() => {
+			// Start a new bout to begin the game
+			gameStateManager.startBout();
+		}, 100);
 	};
 
 	const exitToHome = () => {
 		// Logic to exit to home
-		// Make sure to unpause audio and game state before navigating
-		gameStateManager.setPause(false);
-		audioManager.setPause(false);
 		handleClose();
-		// Navigation logic would go here
 	};
 
 	const handleClose = () => {

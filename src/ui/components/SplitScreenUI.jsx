@@ -49,6 +49,15 @@ function SplitScreenUI() {
 			console.log(`Bout ${data.bout} started`);
 		});
 
+		// NEW: Listen for game reset
+		const unsubscribeGameReset = gameStateManager.on('gameReset', () => {
+			console.log('Game reset detected in UI - clearing scores and metadata');
+			// Reset all state to initial values
+			setBoutMetadata({});
+			setRedScore(0);
+			setBlueScore(0);
+		});
+
 		// Initialize with current state
 		const currentMetadata = gameStateManager.getBoutMetadata();
 		setBoutMetadata(currentMetadata);
@@ -61,6 +70,7 @@ function SplitScreenUI() {
 			unsubscribeBoutEnd();
 			unsubscribePointsChanged();
 			unsubscribeBoutStart();
+			unsubscribeGameReset(); // Clean up the new event listener
 		};
 	}, []);
 
@@ -97,6 +107,21 @@ function SplitScreenUI() {
 	};
 
 	const totalBouts = gameStateManager.getTotalBouts();
+
+	// Force a UI update if the actual scores don't match state
+	// This helps ensure UI is in sync with gameStateManager
+	useEffect(() => {
+		const actualRedScore = gameStateManager.getPoints('red');
+		const actualBlueScore = gameStateManager.getPoints('blue');
+
+		if (actualRedScore !== redScore) {
+			setRedScore(actualRedScore);
+		}
+
+		if (actualBlueScore !== blueScore) {
+			setBlueScore(actualBlueScore);
+		}
+	}, [redScore, blueScore]);
 
 	return (
 		<div className={`absolute w-full h-full top-[65%]`}>

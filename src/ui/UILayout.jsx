@@ -7,11 +7,11 @@ import Confetti from 'react-confetti';
 import { useModal } from '../contexts/ModalContext';
 import GameMenu from './components/GameMenu';
 import audioManager from '../utils/AudioManager';
+import CountdownModal from './components/CountdownModal';
 
 function UILayout() {
 	const [countdown, setCountdown] = useState(3);
 	const [winner, setWinner] = useState(null);
-	const [promptNewGame, setPromptNewGame] = useState(false);
 
 	const { openModal, closeModal } = useModal();
 	const menuModalRef = useRef(null);
@@ -20,6 +20,11 @@ function UILayout() {
 	useEffect(() => {
 		gameStateManager.on('countdown', (data) => {
 			setCountdown(data.timer);
+			console.log(data.timer);
+		});
+
+		gameStateManager.on('boutStart', (data) => {
+			setWinner(false);
 		});
 
 		gameStateManager.on('winnerRevealed', (data) => {
@@ -36,8 +41,8 @@ function UILayout() {
 				);
 				modalID = openModal(element);
 				menuModalRef.current = modalID;
-				gameStateManager.setPause(false);
-				audioManager.setPause(false);
+				// gameStateManager.setPause(false);
+				// audioManager.setPause(false);
 			}, 6000);
 		});
 	}, []);
@@ -48,17 +53,18 @@ function UILayout() {
 				// If locked by winner, don't close it
 				if (menuLockedOpen.current) return;
 
+				// audioManager.setPause(!audioManager.isPaused());
+
 				// Toggle menu
 				if (menuModalRef.current) {
 					closeModal(menuModalRef.current);
 					menuModalRef.current = null;
 					gameStateManager.setPause(false);
-					audioManager.setPause(false);
 				} else {
 					const id = openModal(<GameMenu modalID={() => id} />);
 					menuModalRef.current = id;
 					gameStateManager.setPause(true);
-					audioManager.setPause(true);
+					// audioManager.setPause(true, true);
 				}
 			}
 		};
@@ -154,18 +160,8 @@ function UILayout() {
 				<SplitScreenUI />
 
 				<div className='center-screen'>
-					<div className='w-full flex justify-center items-center'>
-						{countdown > 0 && !winner && (
-							<div className={`relative top-1 font-medieval font-extrabold text-4xl`}>
-								{countdown == 3
-									? 'MARKS!'
-									: countdown == 2
-									? 'READY!'
-									: countdown == 1
-									? 'JOUST!!'
-									: ''}
-							</div>
-						)}
+					<div className={`flex w-full justify-center items-center`}>
+						<CountdownModal countdown={countdown} />
 					</div>
 				</div>
 			</div>

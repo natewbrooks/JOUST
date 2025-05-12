@@ -122,6 +122,24 @@ export class ShieldEntity {
 		// This is just here to match the entity interface
 	}
 
+	reset() {
+		// Reset key states
+		Object.keys(this.keysPressed).forEach((key) => {
+			this.keysPressed[key] = false;
+		});
+
+		// Reset position to initial if we have it
+		if (this.initialPosition && this.handRef) {
+			this.handRef.position.copy(this.initialPosition);
+			this.handRef.rotation.z = -1; // Reset to default rotation
+		}
+
+		// If initialPosition was never set, try to store it now
+		if (!this.initialPosition && this.handRef && this.handRef.position) {
+			this.initialPosition = new THREE.Vector3().copy(this.handRef.position);
+		}
+	}
+
 	dispose() {
 		// Cancel animation loop
 		if (this.animationFrameId) {

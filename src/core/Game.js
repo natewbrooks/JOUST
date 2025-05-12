@@ -181,6 +181,7 @@ class Game {
 
 		// Set up event listeners for GameState events
 		this.setupGameStateListeners();
+		this.setupGameResetListener();
 
 		// Start game
 		gameStateManager.startBout();
@@ -451,6 +452,82 @@ class Game {
 		this.opponent.horse.playAnimation('Idle');
 	}
 
+	resetGame() {
+		// Stop the current animation loop
+		this.stop();
+
+		// Reset time control
+		this.timeScale = 1.0;
+		this.targetTimeScale = 1.0;
+		this.booPlayed = false;
+		this.horsesPassed = false;
+
+		// Reset walking states
+		this.playerWalking = false;
+		this.opponentWalking = false;
+		this.playerWalkStartX = null;
+		this.opponentWalkStartX = null;
+
+		// Reset player/opponent positions
+		this.playerStartX = gameStateManager.movementOptions.startPosX.right;
+		this.opponentStartX = gameStateManager.movementOptions.startPosX.left;
+
+		this.playerPos = { x: this.playerStartX, y: 2, z: 0 };
+		this.opponentPos = { x: this.opponentStartX, y: 2, z: 2 };
+
+		// Re-randomize team assignments
+		const playerTeam = Math.random() < 0.5 ? 'red' : 'blue';
+		const opponentTeam = playerTeam === 'red' ? 'blue' : 'red';
+
+		// Reset entities with new teams
+		if (this.player) {
+			// Use setTeam instead of directly setting team property
+			this.player.setTeam(playerTeam);
+			this.player.resetPosition(this.playerPos);
+			this.player.horse.playAnimation('Idle');
+
+			// Reset player direction based on new starting position
+			if (this.player.flipped !== this.playerStartX < 0) {
+				this.player.flip();
+			}
+		}
+
+		if (this.opponent) {
+			// Use setTeam instead of directly setting team property
+			this.opponent.setTeam(opponentTeam);
+			this.opponent.resetPosition(this.opponentPos);
+			this.opponent.horse.playAnimation('Idle');
+
+			// Reset opponent direction based on new starting position
+			if (this.opponent.flipped !== this.opponentStartX < 0) {
+				this.opponent.flip();
+			}
+		}
+
+		// Update knight references in GameStateManager
+		gameStateManager.setKnight(true, this.player);
+		gameStateManager.setKnight(false, this.opponent);
+
+		// Reset camera
+		if (this.cameraManager) {
+			this.cameraManager.resetCamera();
+		}
+
+		// Force UI update to reflect the reset scores
+		this.notifySubscribers();
+
+		// Restart the animation loop
+		this.start();
+	}
+
+	// Set up listener for game reset
+	setupGameResetListener() {
+		gameStateManager.on('gameReset', () => {
+			console.log('Resetting game completely');
+			this.resetGame();
+		});
+	}
+
 	swapZPositionsAndFlip() {
 		// Reset bout state
 		this.resetBoutState();
@@ -503,7 +580,6 @@ class Game {
 			// When paused: still render the scene but don't update game state
 			// This ensures animations freeze but music keeps playing
 
-			console.log(gameStateManager.paused);
 			// Still update UI to show paused state
 			this.uiManager.update(0);
 

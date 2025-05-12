@@ -314,6 +314,103 @@ export class KnightEntity {
 		this.animator.playAnimation(name);
 	}
 
+	resetPosition(newPosition) {
+		// Update the entity's position
+		this.position = { ...newPosition };
+
+		// Reset combat state
+		this.hasHitThisRound = false;
+
+		// Update the model position
+		this.updatePosition();
+
+		// Reset lance if it exists
+		if (this.lance) {
+			// Ensure lance has the correct team set
+			if (this.lance.team !== this.team) {
+				this.lance.team = this.team;
+
+				// Update the lance material color to match team
+				if (typeof this.lance.setMaterialToTeam === 'function') {
+					this.lance.setMaterialToTeam(this.team);
+				}
+			}
+
+			// Call lance reset method
+			if (typeof this.lance.reset === 'function') {
+				this.lance.reset();
+			}
+		}
+
+		// Reset shield if it exists
+		if (this.shield && typeof this.shield.reset === 'function') {
+			this.shield.reset();
+		}
+
+		// Reset horse position and animation
+		if (this.horse) {
+			this.horse.playAnimation('Idle');
+			this.horse.update(0, {
+				x: this.position.x,
+				y: this.position.y - 2.5,
+				z: this.position.z,
+			});
+		}
+	}
+
+	setTeam(newTeam) {
+		if (newTeam !== 'red' && newTeam !== 'blue') return;
+
+		this.team = newTeam;
+
+		// Update lance material to match new team if it exists
+		if (this.lance) {
+			// Set the team on the lance entity
+			this.lance.team = newTeam;
+
+			// Update the lance's material color
+			if (this.lance.setMaterialToTeam) {
+				this.lance.setMaterialToTeam(newTeam);
+			}
+		}
+
+		// Update any other team-specific properties as needed
+		if (this.model) {
+			this.model.userData.type = newTeam;
+		}
+	}
+
+	resetPosition(newPosition) {
+		// Update the entity's position
+		this.position = { ...newPosition };
+
+		// Reset combat state
+		this.hasHitThisRound = false;
+
+		// Update the model position
+		this.updatePosition();
+
+		// Reset lance if it exists
+		if (this.lance && typeof this.lance.reset === 'function') {
+			this.lance.reset();
+		}
+
+		// Reset shield if it exists
+		if (this.shield && typeof this.shield.reset === 'function') {
+			this.shield.reset();
+		}
+
+		// Reset horse position and animation
+		if (this.horse) {
+			this.horse.playAnimation('Idle');
+			this.horse.update(0, {
+				x: this.position.x,
+				y: this.position.y - 2.5,
+				z: this.position.z,
+			});
+		}
+	}
+
 	dispose() {
 		// Clean up horse
 		if (this.horse) {
