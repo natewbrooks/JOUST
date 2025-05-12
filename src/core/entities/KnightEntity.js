@@ -136,6 +136,9 @@ export class KnightEntity {
 					})
 				);
 
+				// small vertical offset
+				sphere.position.add(new THREE.Vector3(0, 0.25, 0));
+
 				sphere.name = `[HITBOX] ${targetName}`;
 				sphere.userData.type = this.team; // Use this team for correct targeting
 				sphere.userData.part = targetName;
@@ -143,7 +146,6 @@ export class KnightEntity {
 				// Mark as a hitbox for the lance to detect
 				sphere.userData.isHitbox = true;
 
-				console.log(sphere);
 				child.add(sphere);
 				// console.log('Added hitbox for:', child.name);
 			}
@@ -158,6 +160,7 @@ export class KnightEntity {
 		this.model.traverse((child) => {
 			// Check if this is a hitbox
 			if (child.userData?.isHitbox === true || child.name.toLowerCase().includes('hitbox')) {
+				// No type specified, add all hitboxes
 				hitboxes.push(child);
 			}
 		});
@@ -166,18 +169,22 @@ export class KnightEntity {
 	}
 
 	getHitbox(name) {
-		if (!this.model) return [];
+		if (!this.model) return null;
+
+		let foundHitbox = null;
 
 		this.model.traverse((child) => {
+			if (foundHitbox) return;
+
 			// Check if this is a hitbox
 			if (child.userData?.isHitbox === true || child.name.toLowerCase().includes('hitbox')) {
-				if (child.name.includes(name)) {
-					return child;
+				if (child.name.toLowerCase().includes(name.toLowerCase())) {
+					foundHitbox = child;
 				}
 			}
 		});
 
-		return null;
+		return foundHitbox;
 	}
 
 	findBones() {

@@ -394,7 +394,6 @@ export class LanceEntity {
 		// Process actual hits
 		if (intersects.length > 0) {
 			const firstHit = intersects[0].object;
-			console.log('HIT', firstHit);
 
 			const isHitbox = firstHit.userData.isHitbox;
 			if (!isHitbox) return;

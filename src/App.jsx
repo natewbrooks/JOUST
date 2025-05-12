@@ -93,7 +93,7 @@ function App() {
 						width: '100vw',
 						height: '100vh',
 						zIndex: 0,
-						outline: 'none', // Remove default focus outline
+						outline: 'none',
 					}}></div>
 			</div>
 			<UILayout />

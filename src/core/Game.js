@@ -180,16 +180,20 @@ class Game {
 	// Set up event listeners for GameState events
 	setupGameStateListeners() {
 		// Listen for when we need to reset positions (swap)
-		GameState.on('positionsReset', (data) => {
-			if (data.swap) {
-				this.swapZPositionsAndFlip();
-				this.booPlayed = false;
-			}
+		// GameState.on('positionsReset', (data) => {
+		// 	if (data.swap) {
+		// 	}
+		// });
+
+		GameState.on('transitionMidpoint', (data) => {
+			this.swapZPositionsAndFlip();
+			this.booPlayed = false;
 		});
 
 		// Listen for bout completion
 		GameState.on('boutCompleted', (data) => {
 			console.log('Bout completed, preparing for next bout:', data.bout);
+			// GameState.playScreenTransition();
 		});
 
 		// Listen for game end

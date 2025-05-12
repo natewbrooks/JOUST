@@ -36,6 +36,11 @@ class AudioManager {
 			headshot: 'AnvilHit.mp3',
 			neigh: 'HorseNeigh.mp3',
 			boo: 'Boo.mp3',
+			woosh: 'Woosh.mp3',
+			three: '/countdown/three.mp3',
+			two: '/countdown/two.mp3',
+			one: '/countdown/one.mp3',
+			zero: '/countdown/zero.mp3',
 		};
 
 		// Set up user gesture listener to initialize audio
@@ -54,7 +59,7 @@ class AudioManager {
 			console.log('Default audio files preloaded');
 
 			// Queue background music to play after initialization
-			this.playMusic('bg', { volume: 0.35 });
+			this.playMusic('bg', { volume: 0.2 });
 		} catch (error) {
 			console.error('Failed to preload default audio:', error);
 		}

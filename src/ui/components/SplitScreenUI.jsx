@@ -126,11 +126,11 @@ function SplitScreenUI() {
 
 				<div className={`absolute w-full flex  items-center justify-center h-fit`}>
 					<img
-						src={'/ui/WoodenBeam.png'}
+						src={'/ui/HorizontalWoodenBeam.png'}
 						className='relative scale-x-105 w-full z-0 h-[100px]'
 						alt='Beam'
 					/>
-					<div className={`absolute w-full flex justify-center items-center h-full`}>
+					<div className={`absolute w-full flex justify-center items-center h-full pt-2`}>
 						<TextBold
 							text={blueScore}
 							className={`text-darkbrown text-[42px]`}

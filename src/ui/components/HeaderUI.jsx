@@ -72,23 +72,21 @@ function HeaderUI() {
 
 	return (
 		<div className='banner relative'>
-			<div
-				className={`bg-black h-[60px] w-full flex justify-between absolute -z-10 top-0 px-2 pt-1`}>
+			<img
+				src={'/ui/HorizontalWoodenBeam.png'}
+				className='absolute scale-x-105 w-full -translate-y-8 z-0 h-[100px]'
+				alt='Beam'
+			/>
+
+			<div className={`h-[60px] w-full flex justify-between absolute z-200 top-0 px-2 pt-1`}>
 				<div className={`flex flex-col`}>
-					<TextBold
-						text={`ELAPSED`}
-						className={`text-blue text-[14px]`}
-					/>
+					<p className={`text-white text-[12px] font-medieval font-extrabold w-[90px]`}>ELAPSED</p>
 					<p className={`text-white text-[12px] font-medieval font-extrabold w-[90px]`}>
 						{elapsedTime}
 					</p>
 				</div>
 				<div className={`flex flex-col text-end`}>
-					<TextBold
-						text={`BOUT`}
-						className={`text-red text-[14px]`}
-					/>
-
+					<p className={`text-white text-[12px] font-medieval font-extrabold w-[90px]`}>BOUT</p>
 					<p className={`text-white text-[12px] font-medieval font-extrabold tracking-widest`}>
 						{currentBout + '/' + GameState.getTotalBouts()}
 					</p>
@@ -119,7 +117,7 @@ function HeaderUI() {
 					</div>
 					<TextBold
 						text={`JOUST.`}
-						className={`mx-8 mt-1 2xl:mt-2 text-black text-[42px]`}
+						className={`mx-8 mt-2 text-black text-[42px]`}
 					/>
 					<div className={`w-fit flex space-x-6 2xl:space-x-10 relative mt-2`}>
 						{rightShields.map((s, index) => (

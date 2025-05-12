@@ -1,8 +1,9 @@
+import gsap from 'gsap';
 import audioManager from './utils/AudioManager';
 
 // game-state.js
 const GameState = (() => {
-	let debug = false;
+	let debug = true;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;
@@ -10,7 +11,7 @@ const GameState = (() => {
 	let current_bout = 0;
 	let game_start_time = null;
 
-	const MAX_BOUTS = 5;
+	const MAX_BOUTS = 8;
 
 	let knights = {
 		player: null,
@@ -18,9 +19,10 @@ const GameState = (() => {
 	};
 
 	let movementOptions = {
-		moveSpeed: 7,
-		nearHalfwayDistance: 10, // how far distance you need to trigger zoom
-		nearHalfwaySpeed: 3,
+		moveSpeed: 7, // 7
+		nearHalfwayDistance: 6, // how far distance you need to trigger zoom
+		nearHalfwaySpeed: 3, //3
+		horseWalkSpeed: 0.5,
 		startPosX: {
 			left: 20,
 			right: -20,
@@ -38,6 +40,7 @@ const GameState = (() => {
 		gameEnd: [],
 		stateChange: [],
 		pointsChanged: [],
+		transitionMidpoint: [],
 		boutDataChanged: [], // New event for any bout data change
 		boutCompleted: [], // When both players finish their bout
 		positionsReset: [], // When positions need to be reset for next bout
@@ -156,12 +159,28 @@ const GameState = (() => {
 		notifyListeners('boutStart', { bout: current_bout });
 
 		countdownInterval = setInterval(() => {
-			bout_countdown_timer -= 1;
+			let soundFile;
+
+			if (bout_countdown_timer === 3) {
+				soundFile = 'three';
+			} else if (bout_countdown_timer === 2) {
+				soundFile = 'two';
+			} else if (bout_countdown_timer === 1) {
+				soundFile = 'one';
+			} else if (bout_countdown_timer === 0) {
+				soundFile = 'zero';
+			}
 
 			// Notify listeners of countdown change
 			notifyListeners('countdown', { timer: bout_countdown_timer, bout: current_bout });
 
-			if (bout_countdown_timer <= 0) {
+			// Play the correct sound file
+			if (soundFile) {
+				audioManager.playSound(soundFile, { loop: false, volume: 0.5 });
+				bout_countdown_timer -= 1;
+			}
+
+			if (bout_countdown_timer <= -1) {
 				clearInterval(countdownInterval);
 				can_move = true;
 				// audioManager.playNeigh(0.4);
@@ -219,24 +238,7 @@ const GameState = (() => {
 		console.log('Both players completed the bout, starting new bout');
 		boutInProgress = false;
 
-		// Check and set metadata for misses
-		const meta = getBoutMetadata(current_bout);
-
-		if (!meta || meta.red.pts_earned === 0) {
-			setBoutMetadata(current_bout, 'red', {
-				part_hit: 'miss',
-				pts_earned: -1,
-				mph_on_contact: -1,
-			});
-		}
-
-		if (!meta || meta.blue.pts_earned === 0) {
-			setBoutMetadata(current_bout, 'blue', {
-				part_hit: 'miss',
-				pts_earned: -1,
-				mph_on_contact: -1,
-			});
-		}
+		GameState.playScreenTransition(); // play swipe animation
 
 		// Notify that bout is completed and positions need to be reset
 		notifyListeners('boutCompleted', {
@@ -255,6 +257,72 @@ const GameState = (() => {
 		setTimeout(() => {
 			startBout();
 		}, 500);
+	};
+
+	const playScreenTransition = () => {
+		// Create a full-screen overlay div if it doesn't exist
+		let overlay = document.getElementById('screen-transition-overlay');
+		if (!overlay) {
+			overlay = document.createElement('div');
+			overlay.id = 'screen-transition-overlay';
+
+			// Style the overlay
+			overlay.style.position = 'fixed';
+			overlay.style.top = '0';
+			overlay.style.left = '0';
+			overlay.style.width = '100%';
+			overlay.style.height = '100%';
+			overlay.style.backgroundColor = '#f2d5a7';
+			overlay.style.zIndex = '1000';
+			overlay.style.transformOrigin = 'left';
+			overlay.style.transform = 'scaleX(0)';
+
+			document.body.appendChild(overlay);
+		}
+
+		// Set initial state
+		gsap.set(overlay, {
+			scaleX: 0,
+			opacity: 1,
+			display: 'block',
+		});
+
+		// Create timeline for the wipe animation
+		const tl = gsap.timeline({
+			onComplete: () => {
+				// Hide overlay when animation is complete
+				gsap.set(overlay, { display: 'none' });
+			},
+		});
+
+		// Play swipe sound
+		audioManager.playSound('woosh', 0.2);
+
+		// Animation sequence
+		tl.to(overlay, {
+			scaleX: 1,
+			duration: 0.4,
+			ease: 'power2.in',
+		})
+			.call(() => {
+				// This is where the game state is actually changed
+				// The screen is now completely covered, so we can update game elements
+
+				// If swapping sides, this would be a good place to trigger that change
+				notifyListeners('transitionMidpoint', {
+					bout: current_bout,
+					nextBout: current_bout + 1,
+				});
+			})
+			.to(overlay, {
+				scaleX: 0,
+				transformOrigin: 'right',
+				duration: 0.8,
+				ease: 'power2.out',
+				delay: 0.1,
+			});
+
+		return tl; // Return the timeline in case we need to control it elsewhere
 	};
 
 	const setKnight = (isPlayer, entity) => {
@@ -312,6 +380,26 @@ const GameState = (() => {
 		}
 	};
 
+	on('transitionMidpoint', ({ bout }) => {
+		const meta = getBoutMetadata(bout);
+
+		if (!meta || meta.red.pts_earned === 0) {
+			setBoutMetadata(bout, 'red', {
+				part_hit: 'miss',
+				pts_earned: -1,
+				mph_on_contact: -1,
+			});
+		}
+
+		if (!meta || meta.blue.pts_earned === 0) {
+			setBoutMetadata(bout, 'blue', {
+				part_hit: 'miss',
+				pts_earned: -1,
+				mph_on_contact: -1,
+			});
+		}
+	});
+
 	return {
 		get debug() {
 			return debug;
@@ -363,6 +451,7 @@ const GameState = (() => {
 		setBoutMetadata,
 		getTotalBouts,
 		isGameComplete,
+		playScreenTransition,
 		startBout,
 		resetGame,
 		on, // Event subscription method

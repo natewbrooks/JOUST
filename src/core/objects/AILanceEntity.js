@@ -241,33 +241,20 @@ export class AILanceEntity extends LanceEntity {
 		const targetPosition = new THREE.Vector3();
 
 		// Get hitboxes from the target entity if the method exists
-		if (this.targetEntity.getHitboxes) {
+		if (this.targetEntity.getHitbox('head')) {
 			// ALWAYS TARGET HEAD HITBOX - no randomness
-			const headHitboxes = this.targetEntity.getHitboxes('head');
+			const headHitbox = this.targetEntity.getHitbox('shoulderl');
 
 			// Force target selection - no random chance based targeting
 			let hitTarget = null;
 
-			if (headHitboxes.length > 0) {
-				// Always target the first head hitbox
-				hitTarget = headHitboxes[0];
-			} else {
-				// Fallback to body if no head
-				const bodyHitboxes = this.targetEntity.getHitboxes('body');
-				if (bodyHitboxes.length > 0) {
-					hitTarget = bodyHitboxes[0];
-				} else {
-					// Last fallback to any hitbox
-					const allHitboxes = this.targetEntity.getHitboxes();
-					if (allHitboxes.length > 0) {
-						hitTarget = allHitboxes[0];
-					}
-				}
-			}
+			if (headHitbox) hitTarget = headHitbox;
 
 			if (hitTarget) {
 				// Get the world position of the selected hitbox
 				hitTarget.getWorldPosition(targetPosition);
+				// targetPosition.add(new THREE.Vector3(0, 0.5, 0));
+				console.log(targetPosition);
 				console.log(`AI perfectly targeting: ${hitTarget.name}`);
 			} else {
 				// If somehow no hitbox was found, target player position
@@ -289,6 +276,72 @@ export class AILanceEntity extends LanceEntity {
 		// For perfect accuracy, also set current aim point to target
 		// This bypasses the lerp smoothing in updateAiming
 		this.currentAimPoint.copy(targetPosition);
+	}
+
+	checkCollisions() {
+		if (!GameState.can_move || this.hasHitThisRound || !this.raycaster) return;
+
+		// Get ray origin (hand position)
+		const offset = new THREE.Vector3(0, 0.25, 0);
+		const handWorldPos = this.lastPositionRef
+			.clone()
+			.add(offset.clone().applyQuaternion(this.handRef.getWorldQuaternion(new THREE.Quaternion())));
+
+		// Ensure ray direction is set
+		const rayDirection = this.raycaster.ray.direction.clone();
+
+		// Get target hitbox ONLY (e.g., "shoulderl" or "head")
+		const hitbox = this.targetEntity?.getHitbox('legl'); // Change string as needed
+
+		if (!hitbox) return;
+
+		// Ensure ray intersects only that hitbox
+		this.raycaster.far = 2.5;
+		const intersects = this.raycaster.intersectObject(hitbox, true);
+
+		if (intersects.length === 0) return;
+
+		const firstHit = intersects[0].object;
+
+		if (!firstHit.userData?.isHitbox) return;
+
+		console.log(`🎯 AI hit: ${firstHit.name}`);
+		this.hasHitThisRound = true;
+		// audioManager.playCheer(0.5);
+
+		const bodyPart = firstHit.userData.part || 'other';
+		console.log(bodyPart);
+
+		let ptsEarned = 0;
+		if (bodyPart === 'head' || bodyPart === 'neck') {
+			ptsEarned = 3;
+			// audioManager.playHeadshot(0.3);
+		} else if (
+			bodyPart.includes('spine') ||
+			bodyPart.includes('shoulder') ||
+			bodyPart.includes('bone')
+		) {
+			ptsEarned = 2;
+		} else {
+			ptsEarned = 1;
+			// audioManager.playOuch(0.3);
+			// audioManager.playNeigh(0.4);
+		}
+
+		const hitData = {
+			part_hit: bodyPart,
+			pts_earned: ptsEarned,
+			mph_on_contact: parseFloat(this.currentSpeed.toFixed(1)),
+		};
+
+		if (this.ownerEntity?.registerHit) {
+			this.ownerEntity.registerHit(hitData);
+		} else {
+			const currentBout = GameState.getBout();
+			if (currentBout > 0) {
+				GameState.setBoutMetadata(currentBout, this.team, hitData);
+			}
+		}
 	}
 
 	dispose() {
