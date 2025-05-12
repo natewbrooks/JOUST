@@ -1,7 +1,7 @@
 // core/entities/PlayerEntity.js
 import * as THREE from 'three';
 import { KnightEntity } from './KnightEntity';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 
 export class PlayerEntity extends KnightEntity {
 	constructor(scene, position, team, flipped, cameraRef, povCameraAnchorRef) {
@@ -18,7 +18,7 @@ export class PlayerEntity extends KnightEntity {
 		super.update(deltaTime, newPosition);
 
 		// Add player-specific debug logging
-		if (GameState.debug && Math.random() < 0.01) {
+		if (gameStateManager.debug && Math.random() < 0.01) {
 			// Get world position
 			const worldPos = new THREE.Vector3();
 			this.model?.getWorldPosition(worldPos);

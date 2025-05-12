@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import TextBold from './TextBold';
 import CrossedLances from './CrossedLances';
 import PennantPeg from './PennantPeg';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 
 function SplitScreenUI() {
 	const [boutMetadata, setBoutMetadata] = useState({});
@@ -12,7 +12,7 @@ function SplitScreenUI() {
 	// Subscribe to game state changes
 	useEffect(() => {
 		// Listen for ANY bout data change (including misses)
-		const unsubscribeBoutDataChanged = GameState.on('boutDataChanged', (data) => {
+		const unsubscribeBoutDataChanged = gameStateManager.on('boutDataChanged', (data) => {
 			// Update bout metadata whenever ANY data changes
 			setBoutMetadata((prev) => ({
 				...prev,
@@ -20,40 +20,40 @@ function SplitScreenUI() {
 			}));
 
 			// Also update scores in case they changed
-			setRedScore(GameState.getPoints('red'));
-			setBlueScore(GameState.getPoints('blue'));
+			setRedScore(gameStateManager.getPoints('red'));
+			setBlueScore(gameStateManager.getPoints('blue'));
 		});
 
 		// Update bout metadata and scores when bouts end
-		const unsubscribeBoutEnd = GameState.on('boutEnd', (data) => {
+		const unsubscribeBoutEnd = gameStateManager.on('boutEnd', (data) => {
 			setBoutMetadata((prev) => ({
 				...prev,
 				[data.bout]: data.metadata,
 			}));
 
 			// Update scores when a bout ends
-			setRedScore(GameState.getPoints('red'));
-			setBlueScore(GameState.getPoints('blue'));
+			setRedScore(gameStateManager.getPoints('red'));
+			setBlueScore(gameStateManager.getPoints('blue'));
 		});
 
 		// Listen for immediate point changes (for positive points)
-		const unsubscribePointsChanged = GameState.on('pointsChanged', (data) => {
+		const unsubscribePointsChanged = gameStateManager.on('pointsChanged', (data) => {
 			// Update scores immediately when points are earned
-			setRedScore(GameState.getPoints('red'));
-			setBlueScore(GameState.getPoints('blue'));
+			setRedScore(gameStateManager.getPoints('red'));
+			setBlueScore(gameStateManager.getPoints('blue'));
 		});
 
 		// Listen for bout start
-		const unsubscribeBoutStart = GameState.on('boutStart', (data) => {
+		const unsubscribeBoutStart = gameStateManager.on('boutStart', (data) => {
 			// Bout start - we don't need to pre-initialize because it will be handled by boutDataChanged
 			console.log(`Bout ${data.bout} started`);
 		});
 
 		// Initialize with current state
-		const currentMetadata = GameState.getBoutMetadata();
+		const currentMetadata = gameStateManager.getBoutMetadata();
 		setBoutMetadata(currentMetadata);
-		setRedScore(GameState.getPoints('red'));
-		setBlueScore(GameState.getPoints('blue'));
+		setRedScore(gameStateManager.getPoints('red'));
+		setBlueScore(gameStateManager.getPoints('blue'));
 
 		// Cleanup
 		return () => {
@@ -96,7 +96,7 @@ function SplitScreenUI() {
 		return pegs;
 	};
 
-	const totalBouts = GameState.getTotalBouts();
+	const totalBouts = gameStateManager.getTotalBouts();
 
 	return (
 		<div className={`absolute w-full h-full top-[65%]`}>

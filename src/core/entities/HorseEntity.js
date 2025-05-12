@@ -60,6 +60,10 @@ export class HorseEntity {
 		this.model.rotation.set(0, this.flipped ? Math.PI / 2 : -Math.PI / 2, 0);
 	}
 
+	faceKing() {
+		this.model.rotation.set(0, 0, 0);
+	}
+
 	updatePosition() {
 		if (this.model) {
 			this.model.position.set(this.position.x, this.position.y, this.position.z);

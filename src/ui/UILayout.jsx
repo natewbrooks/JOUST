@@ -2,17 +2,96 @@ import { useEffect, useState, useRef } from 'react';
 import SplitScreenUI from './components/SplitScreenUI';
 import TextBold from './components/TextBold';
 import HeaderUI from './components/HeaderUI';
-import GameState from '../game-state';
+import gameStateManager from '../GameStateManager';
+import Confetti from 'react-confetti';
+import { useModal } from '../contexts/ModalContext';
+import GameMenu from './components/GameMenu';
+import audioManager from '../utils/AudioManager';
 
 function UILayout() {
 	const [countdown, setCountdown] = useState(3);
+	const [winner, setWinner] = useState(null);
+	const [promptNewGame, setPromptNewGame] = useState(false);
+
+	const { openModal, closeModal } = useModal();
+	const menuModalRef = useRef(null);
+	const menuLockedOpen = useRef(false);
+
 	useEffect(() => {
-		GameState.on('countdown', (data) => {
+		gameStateManager.on('countdown', (data) => {
 			setCountdown(data.timer);
 		});
+
+		gameStateManager.on('winnerRevealed', (data) => {
+			setWinner(data.winner);
+
+			setTimeout(() => {
+				menuLockedOpen.current = true;
+				let modalID = null;
+				const element = (
+					<GameMenu
+						modalID={() => modalID}
+						winner={data.winner}
+					/>
+				);
+				modalID = openModal(element);
+				menuModalRef.current = modalID;
+				gameStateManager.setPause(false);
+				audioManager.setPause(false);
+			}, 6000);
+		});
 	}, []);
+
+	useEffect(() => {
+		const handleKeyDown = (e) => {
+			if (e.key === 'Escape') {
+				// If locked by winner, don't close it
+				if (menuLockedOpen.current) return;
+
+				// Toggle menu
+				if (menuModalRef.current) {
+					closeModal(menuModalRef.current);
+					menuModalRef.current = null;
+					gameStateManager.setPause(false);
+					audioManager.setPause(false);
+				} else {
+					const id = openModal(<GameMenu modalID={() => id} />);
+					menuModalRef.current = id;
+					gameStateManager.setPause(true);
+					audioManager.setPause(true);
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, []);
+
+	const confettiColors =
+		winner === 'red'
+			? ['#EB5D57', '#BF423D']
+			: winner === 'blue'
+			? ['#03838F', '#284861']
+			: ['#EB5D57', '#BF423D', '#03838F', '#284861'];
+
 	return (
 		<>
+			{winner && (
+				<Confetti
+					numberOfPieces={400}
+					recycle={true}
+					width={window.innerWidth}
+					height={window.innerHeight}
+					confettiSource={{
+						x: 0,
+						y: 80, // Y offset from the top
+						w: window.innerWidth,
+						h: 0, // Line emitter, not a box
+					}}
+					colors={confettiColors} // red or blue
+				/>
+			)}
+
 			<div
 				className='ui-layer'
 				style={{ zIndex: 100 }}>
@@ -76,7 +155,7 @@ function UILayout() {
 
 				<div className='center-screen'>
 					<div className='w-full flex justify-center items-center'>
-						{countdown > 0 && (
+						{countdown > 0 && !winner && (
 							<div className={`relative top-1 font-medieval font-extrabold text-4xl`}>
 								{countdown == 3
 									? 'MARKS!'

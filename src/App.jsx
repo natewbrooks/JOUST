@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import GameState from './game-state';
+import gameStateManager from './GameStateManager';
 import game from './core/Game';
 import UILayout from './ui/UILayout';
 
@@ -70,7 +70,7 @@ function App() {
 			setCountdown(gameState.countdown);
 		});
 
-		const removeCountdownListener = GameState.on('countdown', (data) => {
+		const removeCountdownListener = gameStateManager.on('countdown', (data) => {
 			setCountdown(data.timer);
 		});
 

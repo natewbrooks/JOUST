@@ -1,7 +1,7 @@
 // core/objects/LanceEntity.js
 import * as THREE from 'three';
 import { ModelLoader } from '../../utils/ModelLoader';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 import audioManager from '../../utils/AudioManager';
 import { PlayerEntity } from '../entities/PlayerEntity';
 
@@ -76,7 +76,7 @@ export class LanceEntity {
 		const sphere = new THREE.Mesh(geometry, material);
 		sphere.position.copy(position);
 		sphere.name = name;
-		sphere.visible = GameState.debug;
+		sphere.visible = gameStateManager.debug;
 		return sphere;
 	}
 
@@ -90,7 +90,7 @@ export class LanceEntity {
 		const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
 		this.rayLine = new THREE.Line(lineGeometry, lineMaterial);
 		this.rayLine.name = '[DEBUG] Lance Hit Ray';
-		this.rayLine.visible = GameState.debug;
+		this.rayLine.visible = gameStateManager.debug;
 		this.scene.add(this.rayLine);
 
 		// Create tip sphere for hit detection visualization
@@ -247,7 +247,7 @@ export class LanceEntity {
 		// Restore original material
 		if (this.originalMaterials.has(sphere)) {
 			sphere.material = this.originalMaterials.get(sphere);
-			if (!GameState.debug) {
+			if (!gameStateManager.debug) {
 				sphere.visible = false;
 			}
 			this.originalMaterials.delete(sphere);
@@ -272,11 +272,11 @@ export class LanceEntity {
 
 		// Update debug elements visibility based on GameState
 		if (this.rayLine) {
-			this.rayLine.visible = GameState.debug;
+			this.rayLine.visible = gameStateManager.debug;
 		}
 
 		if (this.tipSphere) {
-			this.tipSphere.visible = GameState.debug;
+			this.tipSphere.visible = gameStateManager.debug;
 		}
 
 		// Skip if critical components aren't ready
@@ -349,7 +349,7 @@ export class LanceEntity {
 
 	// Method to check for collisions with opponent hitboxes
 	checkCollisions() {
-		if (!GameState.can_move || this.hasHitThisRound || !this.raycaster) return;
+		if (!gameStateManager.can_move || this.hasHitThisRound || !this.raycaster) return;
 
 		// Get hand world position as raycaster origin
 		const offset = new THREE.Vector3(0, 0.25, 0);
@@ -374,7 +374,7 @@ export class LanceEntity {
 			.filter((hit) => !ignored.has(hit.object.uuid));
 
 		// Update debug ray visualization
-		if (this.rayLine && GameState.debug) {
+		if (this.rayLine && gameStateManager.debug) {
 			const hitRayEnd = handWorldPos.clone().add(rayDirection.clone().multiplyScalar(hitRayLength));
 			const positions = this.rayLine.geometry.attributes.position.array;
 			positions[0] = handWorldPos.x;
@@ -450,9 +450,9 @@ export class LanceEntity {
 				this.ownerEntity.registerHit(hitData);
 			} else {
 				// Fallback to direct GameState call if no owner entity
-				const currentBout = GameState.getBout();
+				const currentBout = gameStateManager.getBout();
 				if (currentBout > 0) {
-					GameState.setBoutMetadata(currentBout, this.team, hitData);
+					gameStateManager.setBoutMetadata(currentBout, this.team, hitData);
 					console.log(`Bout ${currentBout} metadata logged for ${this.team} team`);
 				}
 			}

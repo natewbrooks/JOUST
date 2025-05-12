@@ -6,8 +6,9 @@ import { PlayerEntity } from './entities/PlayerEntity';
 import { OpponentEntity } from './entities/OpponentEntity';
 import { ArenaEntity } from './entities/environment/ArenaEntity';
 import { CameraManager } from './cameras/CameraManager';
+import { UIManager } from '../utils/UIManager';
 import { initGraphics } from '../utils/initGraphics';
-import GameState from '../game-state';
+import gameStateManager from '../GameStateManager';
 
 import audioManager from '../utils/AudioManager';
 
@@ -17,9 +18,13 @@ class Game {
 		this.scene = new THREE.Scene();
 
 		// Starting positions
-		this.playerStartX = GameState.movementOptions.startPosX.right;
-		this.opponentStartX = GameState.movementOptions.startPosX.left;
-		this.moveSpeed = GameState.movementOptions.moveSpeed; // 20mph constant speed
+		this.playerStartX = gameStateManager.movementOptions.startPosX.right;
+		this.opponentStartX = gameStateManager.movementOptions.startPosX.left;
+		this.moveSpeed = gameStateManager.movementOptions.moveSpeed; // 20mph constant speed
+
+		// Time control for slow-motion effect
+		this.timeScale = 1.0;
+		this.targetTimeScale = 1.0;
 
 		this.booPlayed = false;
 
@@ -31,26 +36,30 @@ class Game {
 
 		// Setup camera manager
 		this.cameraManager = new CameraManager(this.scene);
+		this.uiManager = new UIManager();
 		audioManager.attachToCamera(this.cameraManager.playerPovCamera);
 
 		// Create arena entity
 		this.arena = new ArenaEntity(this.scene, { x: 0, y: 0, z: 0 });
 
+		const playerTeam = Math.random() < 0.5 ? 'red' : 'blue';
+		const opponentTeam = playerTeam === 'red' ? 'blue' : 'red';
+
 		// Create player entity - NOW RED TEAM
 		this.player = new PlayerEntity(
 			this.scene,
 			this.playerPos,
-			'red', // Changed from 'blue' to 'red'
+			playerTeam,
 			true,
 			this.cameraManager.playerPovCamera,
 			this.cameraManager.povCameraAnchorRef
 		);
-		GameState.setKnight(true, this.player);
+		gameStateManager.setKnight(true, this.player);
 
 		// Create opponent entity - NOW BLUE TEAM (was red)
-		this.opponent = new OpponentEntity(this.scene, this.opponentPos, 'blue', false); // Changed from 'red' to 'blue'
-		GameState.setKnight(false, this.opponent);
-		// console.log(GameState.knights);
+		this.opponent = new OpponentEntity(this.scene, this.opponentPos, opponentTeam, false); // Changed from 'red' to 'blue'
+		gameStateManager.setKnight(false, this.opponent);
+		// console.log(gameStateManager.knights);
 
 		// Game state
 		this.hasAnimatedRef = false;
@@ -66,9 +75,9 @@ class Game {
 		// Subscribers for UI updates
 		this.subscribers = [];
 
-		// Round system state
-		this.playerSlowdownSpeed = GameState.movementOptions.nearHalfwaySpeed;
-		this.opponentSlowdownSpeed = GameState.movementOptions.nearHalfwaySpeed;
+		// Track walking state
+		this.playerWalking = false;
+		this.opponentWalking = false;
 		this.playerWalkStartX = null; // Track where player started walking out
 		this.opponentWalkStartX = null; // Track where opponent started walking out
 
@@ -151,12 +160,13 @@ class Game {
 			window.addEventListener('keydown', (e) => {
 				// Press 'L' to log all scene objects
 				if (e.code === 'KeyL') {
+					this.logSceneObjects();
 					console.log('KEY L PRESSED');
 				}
 			});
 		};
 
-		if (GameState.debug) {
+		if (gameStateManager.debug) {
 			// Create debug info and position display divs
 			this.createDebugUI();
 			this.createDebugHelpers();
@@ -166,40 +176,72 @@ class Game {
 		this.canvas = this.graphics.canvas;
 
 		// Store initial start positions for easy reference
-		this.leftStartX = GameState.movementOptions.startPosX.left;
-		this.rightStartX = GameState.movementOptions.startPosX.right;
+		this.leftStartX = gameStateManager.movementOptions.startPosX.left;
+		this.rightStartX = gameStateManager.movementOptions.startPosX.right;
 
 		// Set up event listeners for GameState events
 		this.setupGameStateListeners();
 
 		// Start game
-		GameState.startBout();
+		gameStateManager.startBout();
 		this.start();
 	}
 
 	// Set up event listeners for GameState events
 	setupGameStateListeners() {
 		// Listen for when we need to reset positions (swap)
-		// GameState.on('positionsReset', (data) => {
+		// gameStateManager.on('positionsReset', (data) => {
 		// 	if (data.swap) {
 		// 	}
 		// });
 
-		GameState.on('transitionMidpoint', (data) => {
+		gameStateManager.on('transitionMidpoint', (data) => {
 			this.swapZPositionsAndFlip();
 			this.booPlayed = false;
 		});
 
 		// Listen for bout completion
-		GameState.on('boutCompleted', (data) => {
+		gameStateManager.on('boutCompleted', (data) => {
 			console.log('Bout completed, preparing for next bout:', data.bout);
-			// GameState.playScreenTransition();
+			// gameStateManager.playScreenTransition();
 		});
 
 		// Listen for game end
-		GameState.on('gameEnd', (data) => {
-			console.log('Game completed!', data);
-			// You can add game end logic here
+		gameStateManager.on('gameEnd', (data) => {
+			// console.log('Game completed!', data);
+			audioManager.stopMusic();
+
+			// Stop horses from moving
+			this.playerWalking = false;
+			this.opponentWalking = false;
+
+			// Transition to a celebratory camera angle
+			if (this.cameraManager) {
+				// Move to a wider angle to show both knights
+				this.cameraManager.transitionToGameEndView();
+				this.playerPos = { x: -1, y: 2, z: 4 };
+				this.opponentPos = { x: 1, y: 2, z: 4 };
+				this.player.faceKing();
+				this.opponent.faceKing();
+			}
+		});
+
+		gameStateManager.on('winnerRevealed', (data) => {
+			// Play victory sound based on winner
+			if (data.winner === this.player.team) {
+				// won
+				audioManager.playSound('victory', { volume: 0.7 });
+				audioManager.playSound('trumpet', { volume: 0.1 });
+				audioManager.playSound('cheer', { loop: true, volume: 0.5 });
+			} else if (data.winner === 'tie') {
+				// tied
+				audioManager.playSound('tie', { volume: 0.7 });
+				audioManager.playSound('boo', { volume: 0.3 });
+			} else {
+				// lost
+				audioManager.playSound('defeat', { volume: 0.8 });
+				audioManager.playSound('cheer', { loop: true, volume: 0.2 });
+			}
 		});
 	}
 
@@ -237,12 +279,24 @@ class Game {
 		document.body.appendChild(positionDisplay);
 
 		// Update position display in animation loop
+		// Update position display in animation loop
 		setInterval(() => {
 			if (this.cameraManager.isDebugCameraActive && this.cameraManager.debugCamera) {
-				const pos = this.cameraManager.debugCamera.position;
+				// Create a temporary Vector3 to store the world position
+				const worldPos = new THREE.Vector3();
+				// Get the world position of the camera
+				this.cameraManager.debugCamera.getWorldPosition(worldPos);
+
 				const rot = this.cameraManager.debugCamera.rotation;
 				positionDisplay.innerHTML =
-					`Pos: ${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}<br>` +
+					`World Pos: ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(
+						2
+					)}<br>` +
+					`Local Pos: ${this.cameraManager.debugCamera.position.x.toFixed(
+						2
+					)}, ${this.cameraManager.debugCamera.position.y.toFixed(
+						2
+					)}, ${this.cameraManager.debugCamera.position.z.toFixed(2)}<br>` +
 					`Rot: ${((rot.x * 180) / Math.PI).toFixed(2)}°, ${((rot.y * 180) / Math.PI).toFixed(
 						2
 					)}°, ${((rot.z * 180) / Math.PI).toFixed(2)}°`;
@@ -295,7 +349,7 @@ class Game {
 
 	checkRoundPositions(deltaTime) {
 		// --- IDLE STATE ---
-		if (!GameState.can_move) {
+		if (!gameStateManager.can_move) {
 			if (this.player.horse.currentAnimation !== 'Idle') {
 				this.player.horse.playAnimation('Idle');
 			}
@@ -324,35 +378,46 @@ class Game {
 			: this.opponentPos.x >= opponentTargetX - 0.5;
 
 		// --- MARK AS REACHED END & SET WALK START ---
-		if (playerReachedOppositeEnd && this.playerWalkStartX === null) {
+		if (playerReachedOppositeEnd && !this.playerWalking) {
+			this.playerWalking = true;
 			this.playerWalkStartX = this.playerPos.x;
-			GameState.markPlayerReachedEnd(true);
+			gameStateManager.markPlayerReachedEnd(true);
 		}
-		if (opponentReachedOppositeEnd && this.opponentWalkStartX === null) {
+
+		if (opponentReachedOppositeEnd && !this.opponentWalking) {
+			this.opponentWalking = true;
 			this.opponentWalkStartX = this.opponentPos.x;
-			GameState.markPlayerReachedEnd(false);
+			gameStateManager.markPlayerReachedEnd(false);
 		}
 
 		// --- PLAYER MOVEMENT ---
-		if (this.playerWalkStartX === null) {
+		if (!this.playerWalking) {
+			// Regular movement at normal speed
 			this.playerPos.x += this.moveSpeed * deltaTime * playerDirection;
 		} else {
-			this.playerPos.x += this.playerSlowdownSpeed * deltaTime * playerDirection;
+			// Walking movement at constant walk speed, unaffected by time scale
+			const walkSpeed = gameStateManager.movementOptions.horseWalkSpeed;
+			this.playerPos.x += (walkSpeed * deltaTime * playerDirection) / this.timeScale;
+
 			const walkDist = Math.abs(this.playerPos.x - this.playerWalkStartX);
-			GameState.updateWalkDistance(true, walkDist);
+			gameStateManager.updateWalkDistance(true, walkDist);
 		}
 
 		// --- OPPONENT MOVEMENT ---
-		if (this.opponentWalkStartX === null) {
+		if (!this.opponentWalking) {
+			// Regular movement at normal speed
 			this.opponentPos.x += this.moveSpeed * deltaTime * opponentDirection;
 		} else {
-			this.opponentPos.x += this.opponentSlowdownSpeed * deltaTime * opponentDirection;
+			// Walking movement at constant walk speed, unaffected by time scale
+			const walkSpeed = gameStateManager.movementOptions.horseWalkSpeed;
+			this.opponentPos.x += (walkSpeed * deltaTime * opponentDirection) / this.timeScale;
+
 			const walkDist = Math.abs(this.opponentPos.x - this.opponentWalkStartX);
-			GameState.updateWalkDistance(false, walkDist);
+			gameStateManager.updateWalkDistance(false, walkDist);
 		}
 
 		// --- ANIMATION STATE ---
-		if (this.playerWalkStartX !== null) {
+		if (this.playerWalking) {
 			if (this.player.horse.currentAnimation !== 'Walk') {
 				this.player.horse.playAnimation('Walk');
 			}
@@ -362,7 +427,7 @@ class Game {
 			}
 		}
 
-		if (this.opponentWalkStartX !== null) {
+		if (this.opponentWalking) {
 			if (this.opponent.horse.currentAnimation !== 'Walk') {
 				this.opponent.horse.playAnimation('Walk');
 			}
@@ -375,10 +440,12 @@ class Game {
 
 	// Reset bout state for new bout
 	resetBoutState() {
+		this.playerWalking = false;
+		this.opponentWalking = false;
 		this.playerWalkStartX = null;
 		this.opponentWalkStartX = null;
-		this.playerSlowdownSpeed = this.moveSpeed;
-		this.opponentSlowdownSpeed = this.moveSpeed;
+		this.timeScale = 1.0;
+		this.targetTimeScale = 1.0;
 		this.horsesPassed = false;
 		this.player.horse.playAnimation('Idle');
 		this.opponent.horse.playAnimation('Idle');
@@ -427,12 +494,39 @@ class Game {
 	}
 
 	animate(timestamp) {
-		// console.log(GameState.currentBoutMetadata === null);
+		// Calculate raw deltaTime first
 		if (!this.lastTime) this.lastTime = timestamp;
-		const deltaTime = (timestamp - this.lastTime) / 1000; // Convert to seconds
+		const rawDeltaTime = (timestamp - this.lastTime) / 1000; // Convert to seconds
 		this.lastTime = timestamp;
 
-		let currentBoutMetadata = GameState.getBoutMetadata(GameState.getBout());
+		if (gameStateManager.paused) {
+			// When paused: still render the scene but don't update game state
+			// This ensures animations freeze but music keeps playing
+
+			console.log(gameStateManager.paused);
+			// Still update UI to show paused state
+			this.uiManager.update(0);
+
+			// Render the scene (without updates)
+			if (this.graphics && this.graphics.render) {
+				this.graphics.render();
+			}
+
+			// Continue animation loop
+			this.animationFrameId = requestAnimationFrame(this.animate.bind(this));
+			return;
+		}
+		// Smoothly interpolate timeScale towards targetTimeScale
+		this.timeScale = gsap.utils.interpolate(
+			this.timeScale,
+			this.targetTimeScale,
+			Math.min(1, rawDeltaTime * 5) // Smooth transition over 0.2 seconds
+		);
+
+		// Calculate adjusted deltaTime with the timeScale
+		const deltaTime = rawDeltaTime * this.timeScale;
+
+		let currentBoutMetadata = gameStateManager.getBoutMetadata(gameStateManager.getBout());
 		if (
 			this.horsesPassed &&
 			!this.booPlayed &&
@@ -445,7 +539,7 @@ class Game {
 
 		this.checkRoundPositions(deltaTime);
 
-		if (GameState.debug) {
+		if (gameStateManager.debug) {
 			// Update position markers
 			if (this.playerMarker) {
 				this.playerMarker.position.set(this.playerPos.x, this.playerPos.y, this.playerPos.z);
@@ -459,37 +553,50 @@ class Game {
 			}
 		}
 
-		// SLOW DOWN MOVEMENT IF DISTANCE IS CLOSE ENOUGH
+		// CHECK DISTANCE AND HANDLE TIME SLOWDOWN
 		let ppos = new THREE.Vector3(this.playerPos.x, this.playerPos.y, this.playerPos.z);
 		let opos = new THREE.Vector3(this.opponentPos.x, this.opponentPos.y, this.opponentPos.z);
 		let dist = ppos.distanceTo(opos);
 
-		// awk number but it accounts for horizontal dist
+		// Handle time slowdown based on distance
 		if (dist <= 2.02) {
 			this.horsesPassed = true;
 		}
 
-		// Use GSAP to smoothly animate the moveSpeed change
-		if (dist < GameState.movementOptions.nearHalfwayDistance && currentBoutMetadata === null) {
-			// Smoothly transition to slow speed
-			gsap.to(this, {
-				moveSpeed: GameState.movementOptions.nearHalfwaySpeed,
-				duration: 0.4,
-				ease: 'power2.out',
-			});
+		// Decide when to trigger time slowdown and when to return to normal time
+		if (
+			dist < gameStateManager.movementOptions.nearHalfwayDistance &&
+			currentBoutMetadata === null &&
+			!this.horsesPassed
+		) {
+			// Slowdown when approaching midway point
+			this.targetTimeScale = gameStateManager.movementOptions.timeSlowdownFactor;
+
+			// Adjust animation speeds to compensate for time slowdown
+			if (this.player.horse && this.player.horse.mixer) {
+				this.player.horse.mixer.timeScale = 1 / this.timeScale;
+			}
+			if (this.opponent.horse && this.opponent.horse.mixer) {
+				this.opponent.horse.mixer.timeScale = 1 / this.timeScale;
+			}
 		} else {
-			// Smoothly transition to normal speed
-			gsap.to(this, {
-				moveSpeed: GameState.movementOptions.moveSpeed,
-				duration: 1,
-				ease: 'power2.out',
-			});
+			// Return to normal time
+			this.targetTimeScale = 1.0;
+
+			// Reset animation speeds
+			if (this.player.horse && this.player.horse.mixer) {
+				this.player.horse.mixer.timeScale = 1.0;
+			}
+			if (this.opponent.horse && this.opponent.horse.mixer) {
+				this.opponent.horse.mixer.timeScale = 1.0;
+			}
 		}
 
-		// Update entities
-		this.player.update(deltaTime, { ...this.playerPos });
-		this.opponent.update(deltaTime, { ...this.opponentPos });
+		// Update entities - passing the raw deltaTime for animations
+		this.player.update(rawDeltaTime, { ...this.playerPos });
+		this.opponent.update(rawDeltaTime, { ...this.opponentPos });
 		this.cameraManager.update(deltaTime, this.player.model);
+		this.uiManager.update(deltaTime);
 
 		// Render the scene
 		if (this.graphics && this.graphics.render) {
@@ -522,8 +629,9 @@ class Game {
 			opponentPos: { ...this.opponentPos },
 			playerMPH: this.moveSpeed,
 			opponentMPH: this.moveSpeed,
-			countdown: GameState.bout_countdown_timer,
-			canMove: GameState.can_move,
+			countdown: gameStateManager.bout_countdown_timer,
+			canMove: gameStateManager.can_move,
+			timeScale: this.timeScale,
 		};
 
 		this.subscribers.forEach((callback) => callback(gameState));

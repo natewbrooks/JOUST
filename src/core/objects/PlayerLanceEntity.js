@@ -1,7 +1,7 @@
 // core/objects/PlayerLanceEntity.js
 import * as THREE from 'three';
 import { LanceEntity } from './LanceEntity';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 
 export class PlayerLanceEntity extends LanceEntity {
 	constructor(scene, cameraRef, handRef, armRef, ownerEntity = null) {
@@ -38,7 +38,7 @@ export class PlayerLanceEntity extends LanceEntity {
 		const previewLineGeometry = new THREE.BufferGeometry().setFromPoints(previewPoints);
 		this.previewRayLine = new THREE.Line(previewLineGeometry, previewLineMaterial);
 		this.previewRayLine.name = '[DEBUG] Lance Preview Ray';
-		this.previewRayLine.visible = GameState.debug;
+		this.previewRayLine.visible = gameStateManager.debug;
 		this.scene.add(this.previewRayLine);
 
 		// Create preview tip sphere (end of preview ray)
@@ -115,7 +115,7 @@ export class PlayerLanceEntity extends LanceEntity {
 		}
 
 		// Update preview ray visualization
-		if (this.previewRayLine && GameState.debug) {
+		if (this.previewRayLine && gameStateManager.debug) {
 			const previewRayEnd = handWorldPos
 				.clone()
 				.add(rayDirection.clone().multiplyScalar(this.previewRayLength));

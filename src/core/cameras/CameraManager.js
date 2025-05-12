@@ -1,8 +1,9 @@
 // core/cameras/CameraManager.js
 import * as THREE from 'three';
 import { setSideViewCamera, setPovCamera, cleanupPovCamera } from '../../utils/cameraTransitions';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 import gsap from 'gsap';
+import audioManager from '../../utils/AudioManager';
 
 export class CameraManager {
 	constructor(scene) {
@@ -79,7 +80,7 @@ export class CameraManager {
 		console.log('POV camera position:', this.playerPovCamera.position);
 		console.log('Debug camera position:', this.debugCamera.position);
 
-		GameState.on('pointsChanged', () => {
+		gameStateManager.on('pointsChanged', () => {
 			gsap.to(this.sideViewCamera, {
 				zoom: 1,
 				duration: 0.5,
@@ -99,8 +100,8 @@ export class CameraManager {
 				this.keys[e.code] = true;
 			}
 
-			// Only allow toggling debug camera if GameState.debug is true
-			if (e.code === 'Tab' && GameState.debug) {
+			// Only allow toggling debug camera if gameStateManager.debug is true
+			if (e.code === 'Tab' && gameStateManager.debug) {
 				e.preventDefault(); // Prevent default tab behavior
 				this.isDebugCameraActive = !this.isDebugCameraActive;
 				console.log('Debug camera active:', this.isDebugCameraActive);
@@ -188,7 +189,7 @@ export class CameraManager {
 
 		// Define target states based on proximity
 		const isClose =
-			playerToOrigin <= GameState.movementOptions.nearHalfwayDistance && !this.horsesPassed;
+			playerToOrigin <= gameStateManager.movementOptions.nearHalfwayDistance && !this.horsesPassed;
 
 		const targetZoom = isClose ? 4 : 1;
 		const targetY = isClose ? 2.5 : 4;
@@ -218,6 +219,47 @@ export class CameraManager {
 		}
 	}
 
+	transitionToGameEndView() {
+		if (!this.camerasInitRef) return;
+		// audioManager.playSound('cheer', { loop: true, volume: 0.3 });
+
+		const kingPos = new THREE.Vector3();
+		this.scene.traverse((child) => {
+			if (child.name.toLowerCase().includes('king_0')) {
+				child.getWorldPosition(kingPos);
+				kingPos.add(new THREE.Vector3(-0.5, 1.75, 0));
+				console.log(kingPos);
+			}
+		});
+
+		this.sideViewCamera.lookAt(kingPos);
+		this.playerPovCamera.lookAt(kingPos);
+
+		// Define target states based on proximity
+		const targetZoom = 4;
+		const targetY = 2.5;
+		const zoomDuration = 8;
+		const yDuration = 5;
+
+		if (this.sideViewCamera.zoom !== targetZoom) {
+			// Only animate if values actually need to change
+			gsap.to(this.sideViewCamera, {
+				zoom: targetZoom,
+				duration: zoomDuration,
+				ease: 'power2.out',
+				onUpdate: () => this.sideViewCamera.updateProjectionMatrix(),
+			});
+		}
+
+		// if (this.sideViewCamera.position.y !== targetY) {
+		// 	gsap.to(this.sideViewCamera.position, {
+		// 		y: kingPos.y,
+		// 		duration: yDuration,
+		// 		ease: 'power2.out',
+		// 	});
+		// }
+	}
+
 	update(deltaTime, playerModel) {
 		// Update debug camera movement if active
 		if (this.isDebugCameraActive) {
@@ -237,7 +279,7 @@ export class CameraManager {
 			}
 
 			// Create debug visualization if needed
-			if (GameState.debug && !this.debugCube) {
+			if (gameStateManager.debug && !this.debugCube) {
 				const cubeGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
 				const cubeMaterial = new THREE.MeshBasicMaterial({
 					color: 0xff0000,
@@ -248,12 +290,12 @@ export class CameraManager {
 			}
 
 			// Update debug cube position
-			if (GameState.debug && this.debugCube) {
+			if (gameStateManager.debug && this.debugCube) {
 				this.debugCube.position.copy(this.playerPovCamera.position);
 			}
 		}
 
-		GameState.on('positionsReset', (data) => {
+		gameStateManager.on('positionsReset', (data) => {
 			if (data.swap) {
 				this.horsesPassed = false;
 			}

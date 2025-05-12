@@ -4,7 +4,7 @@ import { AnimationLoader } from '../../utils/AnimationLoader';
 import { HorseEntity } from './HorseEntity';
 import { LanceEntity } from '../objects/LanceEntity';
 import { ShieldEntity } from '../objects/ShieldEntity';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 import { AILanceEntity } from '../objects/AILanceEntity';
 import { PlayerLanceEntity } from '../objects/PlayerLanceEntity';
 
@@ -85,7 +85,7 @@ export class KnightEntity {
 
 	setupGameStateListeners() {
 		// Reset hit state when new bout starts
-		GameState.on('boutStart', (data) => {
+		gameStateManager.on('boutStart', (data) => {
 			this.resetHitState();
 		});
 	}
@@ -96,7 +96,7 @@ export class KnightEntity {
 		console.log(
 			`${this.team} ${
 				this.isPlayer ? 'player' : 'opponent'
-			}: Reset hit state for bout ${GameState.getBout()}`
+			}: Reset hit state for bout ${gameStateManager.getBout()}`
 		);
 
 		// If lance has a reset method, call it
@@ -114,7 +114,7 @@ export class KnightEntity {
 			);
 
 			// Report hit to GameState
-			GameState.setBoutMetadata(GameState.getBout(), this.team, hitData);
+			gameStateManager.setBoutMetadata(gameStateManager.getBout(), this.team, hitData);
 		}
 	}
 
@@ -129,7 +129,7 @@ export class KnightEntity {
 						targetName.includes('head') ? 8 : 4
 					),
 					new THREE.MeshBasicMaterial({
-						visible: GameState.debug,
+						visible: gameStateManager.debug,
 						color: targetName.includes('head') ? 0xff0000 : 0x00ff00,
 						transparent: true,
 						opacity: 0.5,
@@ -234,7 +234,7 @@ export class KnightEntity {
 			} else {
 				// Opponent uses AI lance that targets the player
 				// We need to get a reference to the player entity
-				const playerEntity = GameState.playerEntity;
+				const playerEntity = gameStateManager.playerEntity;
 
 				this.lance = new AILanceEntity(
 					this.scene,
@@ -255,6 +255,11 @@ export class KnightEntity {
 		this.flipped = !this.flipped;
 		this.model.rotation.set(0, this.flipped ? Math.PI / 2 : -Math.PI / 2, 0);
 		this.horse.flip();
+	}
+
+	faceKing() {
+		this.model.rotation.set(0, 0, 0);
+		this.horse.faceKing();
 	}
 
 	updatePosition() {

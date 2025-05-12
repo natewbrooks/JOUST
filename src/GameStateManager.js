@@ -1,7 +1,6 @@
 import gsap from 'gsap';
 import audioManager from './utils/AudioManager';
 
-// game-state.js
 const GameState = (() => {
 	let debug = true;
 	let use_shaders = false;
@@ -9,9 +8,11 @@ const GameState = (() => {
 	let bout_countdown_timer = 3;
 	let can_move = false;
 	let current_bout = 0;
+	let paused = false;
 	let game_start_time = null;
+	let started_game_end_sequence = false;
 
-	const MAX_BOUTS = 8;
+	const MAX_BOUTS = 1;
 
 	let knights = {
 		player: null,
@@ -19,10 +20,10 @@ const GameState = (() => {
 	};
 
 	let movementOptions = {
-		moveSpeed: 7, // 7
-		nearHalfwayDistance: 6, // how far distance you need to trigger zoom
-		nearHalfwaySpeed: 3, //3
-		horseWalkSpeed: 0.5,
+		moveSpeed: 20, // 7
+		nearHalfwayDistance: 12, // how far distance you need to trigger zoom
+		timeSlowdownFactor: 0.4, // Time slows to 40% during close pass
+		horseWalkSpeed: 0.5, // Used for walking phase
 		startPosX: {
 			left: 20,
 			right: -20,
@@ -38,6 +39,7 @@ const GameState = (() => {
 		boutStart: [],
 		boutEnd: [],
 		gameEnd: [],
+		winnerRevealed: [],
 		stateChange: [],
 		pointsChanged: [],
 		transitionMidpoint: [],
@@ -58,8 +60,8 @@ const GameState = (() => {
 		playerReachedEnd: false,
 		opponentReachedEnd: false,
 		playerWalkedDistance: 0,
-		opponentWalkedDistance: 10,
-		requiredWalkDistance: 10,
+		opponentWalkedDistance: 0,
+		requiredWalkDistance: 1,
 	};
 
 	const setBoutMetadata = (bout, team, data) => {
@@ -137,12 +139,25 @@ const GameState = (() => {
 	const startBout = () => {
 		audioManager.stopSound('cheer');
 
-		if (isGameComplete()) {
+		if (isGameComplete() && !started_game_end_sequence) {
+			console.log('GAME END CALLED GSM');
+			can_move = false;
+			started_game_end_sequence = true;
+			let winner = points.red > points.blue ? 'red' : points.blue > points.red ? 'blue' : 'tie';
+			audioManager.playSound('drumroll', 0.5);
 			notifyListeners('gameEnd', {
 				finalPoints: { ...points },
 				totalBouts: MAX_BOUTS,
-				winner: points.red > points.blue ? 'red' : points.blue > points.red ? 'blue' : 'tie',
+				winner: winner,
 			});
+
+			setTimeout(() => {
+				console.log('WINNER REVEALED GSM');
+				notifyListeners('winnerRevealed', {
+					finalPoints: { ...points },
+					winner: winner,
+				});
+			}, 6000);
 			return;
 		}
 
@@ -238,7 +253,7 @@ const GameState = (() => {
 		console.log('Both players completed the bout, starting new bout');
 		boutInProgress = false;
 
-		GameState.playScreenTransition(); // play swipe animation
+		playScreenTransition(); // play swipe animation
 
 		// Notify that bout is completed and positions need to be reset
 		notifyListeners('boutCompleted', {
@@ -350,6 +365,7 @@ const GameState = (() => {
 		points.blue = 0;
 		bout_countdown_timer = 3;
 		boutInProgress = false;
+		started_game_end_sequence = false;
 
 		// Clear metadata
 		Object.keys(bout_metadata).forEach((key) => delete bout_metadata[key]);
@@ -419,6 +435,24 @@ const GameState = (() => {
 
 		get movementOptions() {
 			return movementOptions;
+		},
+
+		get paused() {
+			return paused;
+		},
+
+		togglePause() {
+			paused = !paused;
+			notifyListeners('stateChange', { paused });
+			return paused;
+		},
+
+		setPause(value) {
+			if (paused !== value) {
+				paused = value;
+				notifyListeners('stateChange', { paused });
+			}
+			return paused;
 		},
 
 		get game_started() {

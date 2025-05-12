@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import TextBold from './TextBold';
 import ShieldDisplay from './ShieldDisplay';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 
 function HeaderUI() {
 	const [shields, setShields] = useState([
@@ -51,8 +51,8 @@ function HeaderUI() {
 	// Update timer every frame
 	useEffect(() => {
 		const updateTimer = () => {
-			setElapsedTime(GameState.getElapsedTime());
-			setCurrentBout(GameState.getBout());
+			setElapsedTime(gameStateManager.getElapsedTime());
+			setCurrentBout(gameStateManager.getBout());
 			animationFrameRef.current = requestAnimationFrame(updateTimer);
 		};
 
@@ -88,7 +88,7 @@ function HeaderUI() {
 				<div className={`flex flex-col text-end`}>
 					<p className={`text-white text-[12px] font-medieval font-extrabold w-[90px]`}>BOUT</p>
 					<p className={`text-white text-[12px] font-medieval font-extrabold tracking-widest`}>
-						{currentBout + '/' + GameState.getTotalBouts()}
+						{currentBout + '/' + gameStateManager.getTotalBouts()}
 					</p>
 				</div>
 			</div>

@@ -6,29 +6,18 @@ class AudioManager {
 		if (AudioManager.instance) return AudioManager.instance;
 		AudioManager.instance = this;
 
-		// Create an AudioListener
 		this.listener = new THREE.AudioListener();
-
-		// Create AudioLoader
 		this.loader = new THREE.AudioLoader();
-
-		// Store loaded audio buffers
-		this.buffers = new Map(); // name → AudioBuffer
-
-		// Store active sounds
-		this.sounds = new Map(); // name → THREE.Audio object
-
-		// Background music
+		this.buffers = new Map();
+		this.sounds = new Map();
 		this.bgMusic = null;
-
-		// Base path for audio files
-		this.basePath = '/audio/'; // customize to match your public assets
-
-		// Track if audio has been initialized with user gesture
+		this.basePath = '/audio/';
 		this.isInitialized = false;
-		this.pendingMusic = null; // Store music to play after initialization
+		this.pendingMusic = null;
+		this.paused = false;
+		this.muted = false;
+		this.volumeScale = 1.0;
 
-		// Default audio files to preload
 		this.defaultAudioFiles = {
 			bg: 'music/WildBoarInn.mp3',
 			ouch: 'Ouch.mp3',
@@ -41,86 +30,82 @@ class AudioManager {
 			two: '/countdown/two.mp3',
 			one: '/countdown/one.mp3',
 			zero: '/countdown/zero.mp3',
+			victory: '/outcomes/victory.mp3',
+			defeat: '/outcomes/defeat.mp3',
+			tie: '/outcomes/tie.mp3',
+			drumroll: '/outcomes/drumroll.mp3',
+			trumpet: '/outcomes/trumpet.mp3',
 		};
 
-		// Set up user gesture listener to initialize audio
 		this.setupUserGestureListener();
-
-		// Preload default audio files
 		this.preloadDefaultAudio();
-
 		return this;
 	}
 
-	// Preload default audio files
+	setMuted(value) {
+		this.muted = value;
+		// Apply mute state to all active sounds
+		this.sounds.forEach((sound) => {
+			const baseVolume = sound.userData.baseVolume || 1;
+			sound.setVolume(value ? 0 : baseVolume * this.volumeScale);
+		});
+
+		if (this.bgMusic) {
+			const musicBaseVolume = this.bgMusic.userData.baseVolume || 0.2;
+			this.bgMusic.setVolume(value ? 0 : musicBaseVolume * this.volumeScale);
+		}
+	}
+
+	isMuted() {
+		return this.muted;
+	}
+
 	async preloadDefaultAudio() {
 		try {
 			await this.loadAll(this.defaultAudioFiles);
 			console.log('Default audio files preloaded');
-
-			// Queue background music to play after initialization
 			this.playMusic('bg', { volume: 0.2 });
 		} catch (error) {
 			console.error('Failed to preload default audio:', error);
 		}
 	}
 
-	// Set up listener for user gestures to initialize audio
 	setupUserGestureListener() {
 		const initializeAudio = async () => {
 			if (!this.isInitialized) {
-				// Resume the audio context
 				const context = this.listener.context;
-
-				if (context.state === 'suspended') {
-					await context.resume();
-				}
-
+				if (context.state === 'suspended') await context.resume();
 				this.isInitialized = true;
 				console.log('Audio context initialized');
-
-				// Play pending music if any
 				if (this.pendingMusic) {
 					this.playMusic(this.pendingMusic.name, this.pendingMusic.options);
 					this.pendingMusic = null;
 				}
-
-				// Remove the event listeners once initialized
 				document.removeEventListener('click', initializeAudio);
 				document.removeEventListener('keydown', initializeAudio);
 				document.removeEventListener('touchstart', initializeAudio);
 			}
 		};
-
-		// Listen for common user interactions
 		document.addEventListener('click', initializeAudio);
 		document.addEventListener('keydown', initializeAudio);
 		document.addEventListener('touchstart', initializeAudio);
 	}
 
-	// Method to manually initialize if needed
 	async initialize() {
 		if (!this.isInitialized) {
 			const context = this.listener.context;
-
-			if (context.state === 'suspended') {
-				await context.resume();
-			}
-
+			if (context.state === 'suspended') await context.resume();
 			this.isInitialized = true;
 			console.log('Audio context manually initialized');
 		}
 	}
 
-	// Method to attach listener to camera
 	attachToCamera(camera) {
 		camera.add(this.listener);
 	}
 
-	// Load audio file
 	async load(name, file) {
 		if (this.buffers.has(name)) return Promise.resolve();
-
 		return new Promise((resolve, reject) => {
 			this.loader.load(
 				`${this.basePath}${file}`,
@@ -128,68 +113,68 @@ class AudioManager {
 					this.buffers.set(name, buffer);
 					resolve();
 				},
-				(xhr) => {
-					// Progress callback
-					console.log(`Loading ${name}: ${((xhr.loaded / xhr.total) * 100).toFixed(1)}%`);
-				},
-				(error) => {
-					console.error(`Error loading ${name}:`, error);
-					reject(error);
-				}
+				(xhr) => console.log(`Loading ${name}: ${((xhr.loaded / xhr.total) * 100).toFixed(1)}%`),
+				reject
 			);
 		});
 	}
 
-	// Load multiple audio files
 	async loadAll(sounds) {
 		const promises = Object.entries(sounds).map(([name, file]) => this.load(name, file));
 		await Promise.all(promises);
 	}
 
-	// Play a sound effect
+	setVolumeScale(scale) {
+		// Ensure scale is between 0 and 1
+		this.volumeScale = Math.max(0, Math.min(1, scale));
+
+		// Apply new scale to all currently playing sounds
+		this.sounds.forEach((sound) => {
+			// Get the sound's base volume (or use 1 if not set)
+			const baseVolume = sound.userData.baseVolume || 1;
+			sound.setVolume(this.muted ? 0 : baseVolume * this.volumeScale);
+		});
+
+		// Apply to background music
+		if (this.bgMusic) {
+			const musicBaseVolume = this.bgMusic.userData.baseVolume || 0.2;
+			this.bgMusic.setVolume(this.muted ? 0 : musicBaseVolume * this.volumeScale);
+		}
+
+		return this.volumeScale;
+	}
+
+	getVolumeScale() {
+		return this.volumeScale;
+	}
+
 	playSound(name, { loop = false, volume = 1, position = null } = {}) {
-		if (!this.isInitialized) {
-			console.warn('Audio not initialized yet. Please interact with the page first.');
-			return null;
-		}
-
+		if (!this.isInitialized) return null;
 		const buffer = this.buffers.get(name);
-		if (!buffer) {
-			console.warn(`Sound "${name}" not loaded`);
-			return null;
-		}
+		if (!buffer) return null;
 
-		// Create audio object
 		const sound = position
 			? new THREE.PositionalAudio(this.listener)
 			: new THREE.Audio(this.listener);
 		sound.setBuffer(buffer);
 		sound.setLoop(loop);
-		sound.setVolume(volume);
 
-		// If position is provided and it's positional audio, set the reference distance
+		// Store the base volume in userData for reference
+		sound.userData.baseVolume = volume;
+
+		// Apply volume with scaling
+		sound.setVolume(this.muted ? 0 : volume * this.volumeScale);
+
 		if (position && sound instanceof THREE.PositionalAudio) {
 			sound.setRefDistance(20);
 			sound.position.copy(position);
 		}
-
-		// Start playing
 		sound.play();
-
-		// Store the sound
 		this.sounds.set(name, sound);
-
-		// Remove from map when finished (if not looping)
-		if (!loop) {
-			sound.onEnded = () => {
-				this.sounds.delete(name);
-			};
-		}
-
+		if (!loop) sound.onEnded = () => this.sounds.delete(name);
 		return sound;
 	}
 
-	// Stop a sound
 	stopSound(name) {
 		const sound = this.sounds.get(name);
 		if (sound) {
@@ -198,36 +183,30 @@ class AudioManager {
 		}
 	}
 
-	// Play background music
 	playMusic(name, options = {}) {
 		if (!this.isInitialized) {
-			console.log('Audio not initialized. Music will play after user interaction.');
 			this.pendingMusic = { name, options };
 			return;
 		}
-
 		this.stopMusic();
-
 		const buffer = this.buffers.get(name);
-		if (!buffer) {
-			console.warn(`Music "${name}" not loaded`);
-			return;
-		}
+		if (!buffer) return;
 
 		let volume = options.volume;
-		if (typeof volume !== 'number' || !isFinite(volume)) {
-			console.warn(`Invalid volume "${volume}" passed to playMusic. Defaulting to 0.5`);
-			volume = 0.5;
-		}
+		if (typeof volume !== 'number' || !isFinite(volume)) volume = 0.5;
 
 		this.bgMusic = new THREE.Audio(this.listener);
 		this.bgMusic.setBuffer(buffer);
 		this.bgMusic.setLoop(true);
-		this.bgMusic.setVolume(volume); // safe now
+
+		// Store the base volume in userData for reference
+		this.bgMusic.userData.baseVolume = volume;
+
+		// Apply volume with scaling
+		this.bgMusic.setVolume(this.muted ? 0 : volume * this.volumeScale);
 		this.bgMusic.play();
 	}
 
-	// Stop background music
 	stopMusic() {
 		if (this.bgMusic) {
 			this.bgMusic.stop();
@@ -235,75 +214,109 @@ class AudioManager {
 		}
 	}
 
-	// Set music volume
 	setMusicVolume(value) {
 		if (this.bgMusic) {
-			this.bgMusic.setVolume(value);
+			this.bgMusic.userData.baseVolume = value;
+			this.bgMusic.setVolume(this.muted ? 0 : value * this.volumeScale);
 		}
 	}
 
-	// Stop all sounds and music
+	setPause(toggle = false, allowMusic = false) {
+		const previousPaused = this.paused;
+
+		// Toggle if requested
+		if (toggle) {
+			this.paused = !this.paused;
+		} else {
+			this.paused = true;
+		}
+
+		// Only trigger side effects if pause state changed
+		if (this.paused !== previousPaused) {
+			// notifyListeners('stateChange', {  });
+
+			if (this.paused) {
+				if (allowMusic) {
+					audioManager.pauseAllExceptMusic();
+				} else {
+					audioManager.pauseAll();
+				}
+			} else {
+				audioManager.resumeAll();
+			}
+		}
+
+		return this.paused;
+	}
+
+	pauseAllExceptMusic() {
+		for (const [name, sound] of this.sounds.entries()) {
+			if (sound.isPlaying) {
+				sound.pause();
+				sound._wasPaused = true;
+			}
+		}
+		// Leave bgMusic playing
+	}
+
+	pauseAll() {
+		for (const [name, sound] of this.sounds.entries()) {
+			if (sound.isPlaying) {
+				sound.pause(); // Pause (does not reset time like .stop())
+				sound._wasPaused = true; // Track that we paused it manually
+			}
+		}
+		if (this.bgMusic && this.bgMusic.isPlaying) {
+			this.bgMusic.pause();
+			this.bgMusic._wasPaused = true;
+		}
+	}
+
+	resumeAll() {
+		for (const [name, sound] of this.sounds.entries()) {
+			if (sound._wasPaused) {
+				sound.play(); // Resume playback
+				sound._wasPaused = false;
+			}
+		}
+		if (this.bgMusic && this.bgMusic._wasPaused) {
+			this.bgMusic.play();
+			this.bgMusic._wasPaused = false;
+		}
+	}
+
 	stopAll() {
-		// Stop all individual sounds
 		this.sounds.forEach((sound) => sound.stop());
 		this.sounds.clear();
-
-		// Stop background music
 		this.stopMusic();
-
-		// Clear pending music
 		this.pendingMusic = null;
 	}
 
-	// Get the audio listener (useful for camera attachment)
 	getListener() {
 		return this.listener;
 	}
 
-	// Check if audio is initialized
 	isAudioInitialized() {
 		return this.isInitialized;
 	}
 
-	// Convenience methods for specific sounds
 	playOuch(volume = 1) {
-		return this.playSound('ouch', { volume, loop: false });
+		return this.playSound('ouch', { volume });
 	}
-
 	playCheer(volume = 1) {
-		return this.playSound('cheer', { volume, loop: false });
+		return this.playSound('cheer', { volume });
 	}
-
 	playHeadshot(volume = 1) {
-		return this.playSound('headshot', { volume, loop: false });
+		return this.playSound('headshot', { volume });
 	}
-
 	playNeigh(volume = 1) {
-		return this.playSound('neigh', { volume, loop: false });
+		return this.playSound('neigh', { volume });
 	}
-
 	playBoo(volume = 1) {
-		return this.playSound('boo', { volume, loop: false });
+		return this.playSound('boo', { volume });
 	}
-
-	// Play 3D positional sound (useful for spatial audio)
 	play3DSound(name, position, options = {}) {
-		const defaultOptions = { volume: 1, loop: false };
-		return this.playSound(name, {
-			...defaultOptions,
-			...options,
-			position,
-		});
-	}
-
-	// Get the audio listener (useful for camera attachment)
-	getListener() {
-		return this.listener;
-	}
-
-	// Check if audio is initialized
-	isAudioInitialized() {
-		return this.isInitialized;
+		return this.playSound(name, { ...options, position });
 	}
 }
 

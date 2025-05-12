@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { PixelArtShader } from '../shaders/PixelArtShader';
-import GameState from '../game-state';
+import gameStateManager from '../GameStateManager';
 
 export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 	scene.background = new THREE.Color('#87ceeb');
@@ -61,7 +61,7 @@ export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 	bottomComposer.addPass(bottomRenderPass);
 	bottomComposer.addPass(bottomPixelPass);
 
-	if (GameState.debug) {
+	if (gameStateManager.debug) {
 		// Add debug grid to help with orientation - make it brighter too
 		const gridHelper = new THREE.GridHelper(100, 100, 0x666666, 0xbbbbbb);
 		scene.add(gridHelper);
@@ -101,11 +101,11 @@ export const initGraphics = (scene, topCameraRef, bottomCameraRef) => {
 		// Update composers
 		topComposer.setSize(w, topHeight);
 		topPixelPass.uniforms['resolution'].value.set(w, topHeight);
-		topPixelPass.uniforms['pixelSize'].value = GameState.use_shaders ? 3.0 : 1.0;
+		topPixelPass.uniforms['pixelSize'].value = gameStateManager.use_shaders ? 3.0 : 1.0;
 
 		bottomComposer.setSize(w, bottomHeight);
 		bottomPixelPass.uniforms['resolution'].value.set(w, bottomHeight);
-		bottomPixelPass.uniforms['pixelSize'].value = GameState.use_shaders ? 3.0 : 1.0;
+		bottomPixelPass.uniforms['pixelSize'].value = gameStateManager.use_shaders ? 3.0 : 1.0;
 	};
 
 	window.addEventListener('resize', handleResize);

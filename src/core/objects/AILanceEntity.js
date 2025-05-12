@@ -1,7 +1,7 @@
 // core/objects/AILanceEntity.js
 import * as THREE from 'three';
 import { LanceEntity } from './LanceEntity';
-import GameState from '../../game-state';
+import gameStateManager from '../../GameStateManager';
 
 export class AILanceEntity extends LanceEntity {
 	constructor(scene, handRef, armRef, ownerEntity, targetEntity) {
@@ -47,7 +47,7 @@ export class AILanceEntity extends LanceEntity {
 		const previewLineGeometry = new THREE.BufferGeometry().setFromPoints(previewPoints);
 		this.previewRayLine = new THREE.Line(previewLineGeometry, previewLineMaterial);
 		this.previewRayLine.name = '[DEBUG] AI Lance Preview Ray';
-		this.previewRayLine.visible = GameState.debug;
+		this.previewRayLine.visible = gameStateManager.debug;
 		this.scene.add(this.previewRayLine);
 
 		// Create preview tip sphere
@@ -125,7 +125,7 @@ export class AILanceEntity extends LanceEntity {
 		}
 
 		// Update debug visualizations
-		if (GameState.debug) {
+		if (gameStateManager.debug) {
 			if (this.rayLine) {
 				const positions = this.rayLine.geometry.attributes.position.array;
 				positions[0] = handWorldPos.x;
@@ -254,8 +254,8 @@ export class AILanceEntity extends LanceEntity {
 				// Get the world position of the selected hitbox
 				hitTarget.getWorldPosition(targetPosition);
 				// targetPosition.add(new THREE.Vector3(0, 0.5, 0));
-				console.log(targetPosition);
-				console.log(`AI perfectly targeting: ${hitTarget.name}`);
+				// console.log(targetPosition);
+				// console.log(`AI perfectly targeting: ${hitTarget.name}`);
 			} else {
 				// If somehow no hitbox was found, target player position
 				targetPosition.copy(playerPosition);
@@ -279,7 +279,7 @@ export class AILanceEntity extends LanceEntity {
 	}
 
 	checkCollisions() {
-		if (!GameState.can_move || this.hasHitThisRound || !this.raycaster) return;
+		if (!gameStateManager.can_move || this.hasHitThisRound || !this.raycaster) return;
 
 		// Get ray origin (hand position)
 		const offset = new THREE.Vector3(0, 0.25, 0);
@@ -337,9 +337,9 @@ export class AILanceEntity extends LanceEntity {
 		if (this.ownerEntity?.registerHit) {
 			this.ownerEntity.registerHit(hitData);
 		} else {
-			const currentBout = GameState.getBout();
+			const currentBout = gameStateManager.getBout();
 			if (currentBout > 0) {
-				GameState.setBoutMetadata(currentBout, this.team, hitData);
+				gameStateManager.setBoutMetadata(currentBout, this.team, hitData);
 			}
 		}
 	}
