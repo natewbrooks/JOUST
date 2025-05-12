@@ -2,7 +2,7 @@ import audioManager from './utils/AudioManager';
 
 // game-state.js
 const GameState = (() => {
-	let debug = true;
+	let debug = false;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;

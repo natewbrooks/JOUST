@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ModelLoader } from '../../utils/ModelLoader';
 import GameState from '../../game-state';
 import audioManager from '../../utils/AudioManager';
+import { PlayerEntity } from '../entities/PlayerEntity';
 
 export class LanceEntity {
 	constructor(scene, handRef, armRef, ownerEntity = null) {
@@ -393,42 +394,38 @@ export class LanceEntity {
 		// Process actual hits
 		if (intersects.length > 0) {
 			const firstHit = intersects[0].object;
+			console.log('HIT', firstHit);
 
-			if (!firstHit.name.toLowerCase().includes('hitbox')) return;
-			console.log('✅ Hit opponent:', firstHit.name);
+			const isHitbox = firstHit.userData.isHitbox;
+			if (!isHitbox) return;
+
+			console.log(
+				'✅ Hit',
+				this.ownerEntity instanceof PlayerEntity ? 'opponent' : 'player',
+				':',
+				firstHit
+			);
 			audioManager.playCheer(0.5);
 			this.hasHitThisRound = true;
 
 			// Determine body part hit
 			let bodyPart = 'other'; // Default to other for 1 point
-			if (firstHit.userData?.part) {
+			if (firstHit.userData.part) {
 				bodyPart = firstHit.userData.part;
-			} else if (firstHit.type === 'Mesh') {
-				const boneName = firstHit.name.toLowerCase();
-
-				// Check for headshot parts: Head and Neck = 3 points
-				if (boneName.includes('head') || boneName.includes('neck')) {
-					bodyPart = 'head';
-				}
-				// Check for body shot parts: Spine and Shoulder = 2 points
-				else if (boneName.includes('spine') || boneName.includes('shoulder')) {
-					bodyPart = 'body';
-				}
-				// Everything else = 1 point (other)
-				else {
-					bodyPart = 'other';
-				}
 			}
 
 			// Calculate points based on body part
 			let ptsEarned = 0;
 			switch (bodyPart) {
 				case 'head':
+				case 'neck':
 					ptsEarned = 3;
 					console.log('💥 HEADSHOT! (+3 points)');
 					audioManager.playHeadshot(0.3);
 					break;
-				case 'body':
+				case 'spine':
+				case 'shoulder':
+				case 'bone':
 					ptsEarned = 2;
 					console.log('🎯 Body hit! (+2 points)');
 					break;
@@ -457,7 +454,7 @@ export class LanceEntity {
 				const currentBout = GameState.getBout();
 				if (currentBout > 0) {
 					GameState.setBoutMetadata(currentBout, this.team, hitData);
-					console.log(`📊 Bout ${currentBout} metadata logged for ${this.team} team`);
+					console.log(`Bout ${currentBout} metadata logged for ${this.team} team`);
 				}
 			}
 		}

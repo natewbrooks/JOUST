@@ -13,7 +13,7 @@ export class AILanceEntity extends LanceEntity {
 
 		// AI aiming properties
 		this.aimVariance = 0.0; // Increased randomness for more misses
-		this.aimUpdateInterval = 1;
+		this.aimUpdateInterval = 0.5;
 		this.timeSinceLastAimUpdate = 0;
 		this.currentAimPoint = new THREE.Vector3();
 		this.targetAimPoint = new THREE.Vector3();
@@ -237,97 +237,58 @@ export class AILanceEntity extends LanceEntity {
 		// Calculate vector from knight to player
 		const toPlayer = new THREE.Vector3().subVectors(playerPosition, knightPosition);
 
-		// Determine if player is in front of the knight
-		const dotProduct = toPlayer.dot(knightForward);
-		const playerInFront = dotProduct > 0;
-
-		// Decide whether to miss
-		const shouldMiss = Math.random() < 0.4; // 40% chance to miss
-
 		// Set target position
 		const targetPosition = new THREE.Vector3();
 
-		if (playerInFront && !shouldMiss) {
-			// Try to hit the player
+		// Get hitboxes from the target entity if the method exists
+		if (this.targetEntity.getHitboxes) {
+			// ALWAYS TARGET HEAD HITBOX - no randomness
+			const headHitboxes = this.targetEntity.getHitboxes('head');
+
+			// Force target selection - no random chance based targeting
 			let hitTarget = null;
 
-			// Get hitboxes from the target entity if the method exists
-			if (this.targetEntity.getHitboxes) {
-				// Get all hitboxes
-				const allHitboxes = this.targetEntity.getHitboxes();
-
-				// If we have hitboxes, decide what to target
-				if (allHitboxes.length > 0) {
-					// 60% chance to aim for the head if available
-					const headHitboxes = this.targetEntity.getHitboxes('head');
-					const bodyHitboxes = this.targetEntity.getHitboxes('body');
-
-					// Weighted random selection:
-					// - 60% chance for head if available
-					// - 30% chance for body if available
-					// - 10% chance for any hitbox
-					const rnd = Math.random();
-					if (rnd < 0.6 && headHitboxes.length > 0) {
-						// Target a random head hitbox
-						hitTarget = headHitboxes[Math.floor(Math.random() * headHitboxes.length)];
-					} else if (rnd < 0.9 && bodyHitboxes.length > 0) {
-						// Target a random body hitbox
-						hitTarget = bodyHitboxes[Math.floor(Math.random() * bodyHitboxes.length)];
-					} else if (allHitboxes.length > 0) {
-						// Target any random hitbox
-						hitTarget = allHitboxes[Math.floor(Math.random() * allHitboxes.length)];
-					}
-
-					if (hitTarget) {
-						// Get the world position of the selected hitbox
-						hitTarget.getWorldPosition(targetPosition);
-						console.log(`AI targeting: ${hitTarget.name}`);
+			if (headHitboxes.length > 0) {
+				// Always target the first head hitbox
+				hitTarget = headHitboxes[0];
+			} else {
+				// Fallback to body if no head
+				const bodyHitboxes = this.targetEntity.getHitboxes('body');
+				if (bodyHitboxes.length > 0) {
+					hitTarget = bodyHitboxes[0];
+				} else {
+					// Last fallback to any hitbox
+					const allHitboxes = this.targetEntity.getHitboxes();
+					if (allHitboxes.length > 0) {
+						hitTarget = allHitboxes[0];
 					}
 				}
 			}
 
-			// If no hitbox was selected, fallback to targeting the player model
-			if (!hitTarget) {
-				targetPosition.copy(playerPosition);
-				// Aim at upper body height
-				targetPosition.y += 0.5;
-			}
-
-			// Add small variance to aiming (natural inaccuracy)
-			const minVariance = 0.1; // Minimum variance for natural inaccuracy
-			targetPosition.x += (Math.random() * 2 - 1) * Math.max(minVariance, this.aimVariance * 0.3);
-			targetPosition.y += (Math.random() * 2 - 1) * Math.max(minVariance, this.aimVariance * 0.3);
-			targetPosition.z += (Math.random() * 2 - 1) * Math.max(minVariance, this.aimVariance * 0.3);
-		} else {
-			// Either deliberately missing or player is behind
-
-			// Create a point far forward in the knight's direction
-			targetPosition.copy(knightPosition).add(knightForward.clone().multiplyScalar(20));
-
-			if (shouldMiss && playerInFront) {
-				// If deliberately missing but player is in front,
-				// aim in their general direction but with large variance
-				const missOffset = new THREE.Vector3(
-					(Math.random() * 2 - 1) * this.aimVariance * 2,
-					(Math.random() * 2 - 1) * this.aimVariance * 2,
-					(Math.random() * 2 - 1) * this.aimVariance * 2
-				);
-
-				targetPosition.copy(playerPosition).add(missOffset);
+			if (hitTarget) {
+				// Get the world position of the selected hitbox
+				hitTarget.getWorldPosition(targetPosition);
+				console.log(`AI perfectly targeting: ${hitTarget.name}`);
 			} else {
-				// Just point forward with some random variance
-				targetPosition.y += (Math.random() * 2 - 1) * 0.5;
-				targetPosition.z += (Math.random() * 2 - 1) * 0.5;
+				// If somehow no hitbox was found, target player position
+				targetPosition.copy(playerPosition);
+				targetPosition.y += 0.5; // Aim at upper body
 			}
+		} else {
+			// Fallback if targeting entity has no hitboxes
+			targetPosition.copy(playerPosition);
+			targetPosition.y += 0.5; // Aim at upper body height
 		}
 
-		// Store as target aim point for smooth interpolation
+		// NO VARIANCE - completely removing this section that adds random offsets
+		// DO NOT add any minimum variance or random offsets here
+
+		// Store as target aim point
 		this.targetAimPoint.copy(targetPosition);
 
-		// Initialize current aim point if it's the first time
-		if (this.currentAimPoint.lengthSq() === 0) {
-			this.currentAimPoint.copy(this.targetAimPoint);
-		}
+		// For perfect accuracy, also set current aim point to target
+		// This bypasses the lerp smoothing in updateAiming
+		this.currentAimPoint.copy(targetPosition);
 	}
 
 	dispose() {

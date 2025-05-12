@@ -143,13 +143,14 @@ export class KnightEntity {
 				// Mark as a hitbox for the lance to detect
 				sphere.userData.isHitbox = true;
 
+				console.log(sphere);
 				child.add(sphere);
 				// console.log('Added hitbox for:', child.name);
 			}
 		});
 	}
 
-	getHitboxes(hitboxType = null) {
+	getHitboxes() {
 		if (!this.model) return [];
 
 		const hitboxes = [];
@@ -157,31 +158,26 @@ export class KnightEntity {
 		this.model.traverse((child) => {
 			// Check if this is a hitbox
 			if (child.userData?.isHitbox === true || child.name.toLowerCase().includes('hitbox')) {
-				// If a specific type is requested, filter by type
-				if (hitboxType) {
-					const childName = child.name.toLowerCase();
-
-					if (hitboxType === 'head' && childName.includes('head')) {
-						hitboxes.push(child);
-					} else if (
-						hitboxType === 'body' &&
-						(childName.includes('spine') || childName.includes('shoulder'))
-					) {
-						hitboxes.push(child);
-					} else if (
-						hitboxType === 'limb' &&
-						(childName.includes('arm') || childName.includes('leg'))
-					) {
-						hitboxes.push(child);
-					}
-				} else {
-					// No type specified, add all hitboxes
-					hitboxes.push(child);
-				}
+				hitboxes.push(child);
 			}
 		});
 
 		return hitboxes;
+	}
+
+	getHitbox(name) {
+		if (!this.model) return [];
+
+		this.model.traverse((child) => {
+			// Check if this is a hitbox
+			if (child.userData?.isHitbox === true || child.name.toLowerCase().includes('hitbox')) {
+				if (child.name.includes(name)) {
+					return child;
+				}
+			}
+		});
+
+		return null;
 	}
 
 	findBones() {
