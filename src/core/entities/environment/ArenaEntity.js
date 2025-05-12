@@ -19,9 +19,6 @@ export class ArenaEntity {
 			this.model = loadedModel;
 			this.setupArena();
 		});
-
-		// Create ground
-		this.createGround();
 	}
 
 	setupArena() {
@@ -36,25 +33,6 @@ export class ArenaEntity {
 		this.arenaLoaded = true;
 
 		console.log('Arena model set up at position:', this.model.position);
-	}
-
-	createGround() {
-		if (this.groundLoaded) return;
-
-		// Create large ground plane
-		const groundGeometry = new THREE.PlaneGeometry(10000, 10000);
-		const groundMaterial = new THREE.MeshStandardMaterial({ color: '#638a3e' });
-		this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-
-		// Position flat on XZ plane
-		this.groundMesh.rotation.x = -Math.PI / 2;
-		this.groundMesh.position.y = 0; // At y = 0
-
-		// Add to scene
-		this.scene.add(this.groundMesh);
-		this.groundLoaded = true;
-
-		console.log('Ground plane created');
 	}
 
 	update(deltaTime) {

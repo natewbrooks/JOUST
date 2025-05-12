@@ -20,11 +20,14 @@ class Game {
 		this.playerStartX = GameState.movementOptions.startPosX.right;
 		this.opponentStartX = GameState.movementOptions.startPosX.left;
 		this.moveSpeed = GameState.movementOptions.moveSpeed; // 20mph constant speed
-		this.isPassedHalfway = false;
+
+		this.booPlayed = false;
 
 		// Initialize positions
-		this.playerPos = { x: this.playerStartX, y: 2.5, z: 0 };
-		this.opponentPos = { x: this.opponentStartX, y: 2.5, z: 2 };
+		this.playerPos = { x: this.playerStartX, y: 2, z: 0 };
+		this.opponentPos = { x: this.opponentStartX, y: 2, z: 2 };
+
+		this.horsesPassed = false;
 
 		// Setup camera manager
 		this.cameraManager = new CameraManager(this.scene);
@@ -42,12 +45,14 @@ class Game {
 			this.cameraManager.playerPovCamera,
 			this.cameraManager.povCameraAnchorRef
 		);
+		GameState.setKnight(true, this.player);
 
 		// Create opponent entity - NOW BLUE TEAM (was red)
 		this.opponent = new OpponentEntity(this.scene, this.opponentPos, 'blue', false); // Changed from 'red' to 'blue'
+		GameState.setKnight(false, this.opponent);
+		// console.log(GameState.knights);
 
 		// Game state
-		this.horsesPassedRef = false;
 		this.hasAnimatedRef = false;
 
 		// Animation frame tracking
@@ -167,25 +172,6 @@ class Game {
 		// Set up event listeners for GameState events
 		this.setupGameStateListeners();
 
-		// Immediately load all audio files
-		const audioFiles = {
-			bg: 'music/WildBoarInn.mp3',
-			ouch: 'Ouch.mp3', // Loads from /audio/Ouch.mp3
-			cheer: 'Cheer.mp3', // Loads from /audio/Cheer.mp3
-			headshot: 'AnvilHit.mp3',
-			neigh: 'HorseNeigh.mp3',
-		};
-
-		audioManager.loadAll(audioFiles).then(() => {
-			// If audio is already initialized (rare), play immediately
-			if (audioManager.isAudioInitialized()) {
-				audioManager.playMusic('bg', { volume: 0.35 });
-			} else {
-				// Queue music to play after user interaction
-				audioManager.playMusic('bg', { volume: 0.35 });
-			}
-		});
-
 		// Start game
 		GameState.startBout();
 		this.start();
@@ -197,6 +183,7 @@ class Game {
 		GameState.on('positionsReset', (data) => {
 			if (data.swap) {
 				this.swapZPositionsAndFlip();
+				this.booPlayed = false;
 			}
 		});
 
@@ -388,7 +375,7 @@ class Game {
 		this.opponentWalkStartX = null;
 		this.playerSlowdownSpeed = this.moveSpeed;
 		this.opponentSlowdownSpeed = this.moveSpeed;
-		this.isPassedHalfway = false;
+		this.horsesPassed = false;
 		this.player.horse.playAnimation('Idle');
 		this.opponent.horse.playAnimation('Idle');
 	}
@@ -436,12 +423,21 @@ class Game {
 	}
 
 	animate(timestamp) {
+		// console.log(GameState.currentBoutMetadata === null);
 		if (!this.lastTime) this.lastTime = timestamp;
 		const deltaTime = (timestamp - this.lastTime) / 1000; // Convert to seconds
 		this.lastTime = timestamp;
 
-		// Check if horses passed
-		this.horsesPassedRef = this.playerPos.x >= this.opponentPos.x;
+		let currentBoutMetadata = GameState.getBoutMetadata(GameState.getBout());
+		if (
+			this.horsesPassed &&
+			!this.booPlayed &&
+			(currentBoutMetadata === null ||
+				(currentBoutMetadata.red.pts_earned === 0 && currentBoutMetadata.blue.pts_earned === 0))
+		) {
+			audioManager.playBoo(0.3);
+			this.booPlayed = true;
+		}
 
 		this.checkRoundPositions(deltaTime);
 
@@ -464,11 +460,13 @@ class Game {
 		let opos = new THREE.Vector3(this.opponentPos.x, this.opponentPos.y, this.opponentPos.z);
 		let dist = ppos.distanceTo(opos);
 
+		// awk number but it accounts for horizontal dist
+		if (dist <= 2.02) {
+			this.horsesPassed = true;
+		}
+
 		// Use GSAP to smoothly animate the moveSpeed change
-		if (
-			dist < GameState.movementOptions.nearHalfwayDistance &&
-			GameState.getBoutMetadata(GameState.getBout()) === null
-		) {
+		if (dist < GameState.movementOptions.nearHalfwayDistance && currentBoutMetadata === null) {
 			// Smoothly transition to slow speed
 			gsap.to(this, {
 				moveSpeed: GameState.movementOptions.nearHalfwaySpeed,

@@ -8,7 +8,7 @@ export class CameraManager {
 	constructor(scene) {
 		this.scene = scene;
 
-		this.passedHalfway = false;
+		this.horsesPassed = false;
 
 		// Create cameras
 		this.playerPovCamera = new THREE.PerspectiveCamera(
@@ -188,7 +188,7 @@ export class CameraManager {
 
 		// Define target states based on proximity
 		const isClose =
-			playerToOrigin <= GameState.movementOptions.nearHalfwayDistance && !this.passedHalfway;
+			playerToOrigin <= GameState.movementOptions.nearHalfwayDistance && !this.horsesPassed;
 
 		const targetZoom = isClose ? 4 : 1;
 		const targetY = isClose ? 2.5 : 4;
@@ -196,7 +196,7 @@ export class CameraManager {
 		const yDuration = isClose ? 5 : 0.5;
 
 		if (playerToOrigin <= 0.05) {
-			this.passedHalfway = true;
+			this.horsesPassed = true;
 		}
 
 		if (this.sideViewCamera.zoom !== targetZoom) {
@@ -252,6 +252,12 @@ export class CameraManager {
 				this.debugCube.position.copy(this.playerPovCamera.position);
 			}
 		}
+
+		GameState.on('positionsReset', (data) => {
+			if (data.swap) {
+				this.horsesPassed = false;
+			}
+		});
 	}
 
 	setPovCameraAnchor(anchor) {

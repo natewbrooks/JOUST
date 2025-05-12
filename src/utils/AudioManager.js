@@ -28,10 +28,36 @@ class AudioManager {
 		this.isInitialized = false;
 		this.pendingMusic = null; // Store music to play after initialization
 
-		// Set up user gesture listener to initialize audio context
+		// Default audio files to preload
+		this.defaultAudioFiles = {
+			bg: 'music/WildBoarInn.mp3',
+			ouch: 'Ouch.mp3',
+			cheer: 'Cheer.mp3',
+			headshot: 'AnvilHit.mp3',
+			neigh: 'HorseNeigh.mp3',
+			boo: 'Boo.mp3',
+		};
+
+		// Set up user gesture listener to initialize audio
 		this.setupUserGestureListener();
 
+		// Preload default audio files
+		this.preloadDefaultAudio();
+
 		return this;
+	}
+
+	// Preload default audio files
+	async preloadDefaultAudio() {
+		try {
+			await this.loadAll(this.defaultAudioFiles);
+			console.log('Default audio files preloaded');
+
+			// Queue background music to play after initialization
+			this.playMusic('bg', { volume: 0.35 });
+		} catch (error) {
+			console.error('Failed to preload default audio:', error);
+		}
 	}
 
 	// Set up listener for user gestures to initialize audio
@@ -168,10 +194,10 @@ class AudioManager {
 	}
 
 	// Play background music
-	playMusic(name, { volume = 0.5 } = {}) {
+	playMusic(name, options = {}) {
 		if (!this.isInitialized) {
 			console.log('Audio not initialized. Music will play after user interaction.');
-			this.pendingMusic = { name, options: { volume } };
+			this.pendingMusic = { name, options };
 			return;
 		}
 
@@ -183,11 +209,16 @@ class AudioManager {
 			return;
 		}
 
-		// Create global (non-positional) audio for background music
+		let volume = options.volume;
+		if (typeof volume !== 'number' || !isFinite(volume)) {
+			console.warn(`Invalid volume "${volume}" passed to playMusic. Defaulting to 0.5`);
+			volume = 0.5;
+		}
+
 		this.bgMusic = new THREE.Audio(this.listener);
 		this.bgMusic.setBuffer(buffer);
 		this.bgMusic.setLoop(true);
-		this.bgMusic.setVolume(volume);
+		this.bgMusic.setVolume(volume); // safe now
 		this.bgMusic.play();
 	}
 
@@ -244,6 +275,10 @@ class AudioManager {
 
 	playNeigh(volume = 1) {
 		return this.playSound('neigh', { volume, loop: false });
+	}
+
+	playBoo(volume = 1) {
+		return this.playSound('boo', { volume, loop: false });
 	}
 
 	// Play 3D positional sound (useful for spatial audio)

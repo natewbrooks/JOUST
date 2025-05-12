@@ -3,11 +3,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { AnimationMixer } from 'three';
 import { Clock } from 'three';
 import * as THREE from 'three';
+import { getAssetPath } from './AssetPath';
 
 export class AnimationLoader {
 	constructor(name, path, scene) {
 		this.name = name;
-		this.path = path;
+		this.path = getAssetPath(path);
 		this.scene = scene;
 
 		this.model = null;

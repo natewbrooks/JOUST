@@ -1,11 +1,13 @@
 // utils/ModelLoader.js
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import * as THREE from 'three';
+import { getAssetPath } from './AssetPath';
 
 export class ModelLoader {
 	constructor(name, path) {
 		this.name = name;
-		this.path = path;
+		this.path = getAssetPath(path);
+		console.log(this.path);
 		this.model = null;
 		this.loadedTexture = null;
 
@@ -50,7 +52,7 @@ export class ModelLoader {
 	}
 
 	setMaterial(path, textureName) {
-		const texture = this.textureLoader.load(path);
+		const texture = this.textureLoader.load(getAssetPath(path));
 		texture.name = textureName;
 		texture.colorSpace = THREE.SRGBColorSpace;
 		texture.wrapS = THREE.RepeatWrapping;

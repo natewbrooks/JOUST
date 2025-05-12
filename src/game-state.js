@@ -2,7 +2,7 @@ import audioManager from './utils/AudioManager';
 
 // game-state.js
 const GameState = (() => {
-	let debug = false;
+	let debug = true;
 	let use_shaders = false;
 	let game_started = false;
 	let bout_countdown_timer = 3;
@@ -11,6 +11,11 @@ const GameState = (() => {
 	let game_start_time = null;
 
 	const MAX_BOUTS = 5;
+
+	let knights = {
+		player: null,
+		opponent: null,
+	};
 
 	let movementOptions = {
 		moveSpeed: 7,
@@ -252,6 +257,14 @@ const GameState = (() => {
 		}, 500);
 	};
 
+	const setKnight = (isPlayer, entity) => {
+		if (isPlayer) {
+			knights.player = entity;
+		} else {
+			knights.opponent = entity;
+		}
+	};
+
 	// Reset bout completion data
 	const resetBoutCompletionData = () => {
 		boutCompletionData.playerReachedEnd = false;
@@ -333,7 +346,16 @@ const GameState = (() => {
 			return boutInProgress;
 		},
 
+		get playerEntity() {
+			return knights.player;
+		},
+
+		get opponentEntity() {
+			return knights.opponent;
+		},
+
 		// Methods
+		setKnight,
 		getBout,
 		getElapsedTime,
 		getPoints,
