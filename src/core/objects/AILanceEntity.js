@@ -12,16 +12,28 @@ export class AILanceEntity extends LanceEntity {
 		this.targetEntity = targetEntity;
 
 		// AI aiming properties
-		this.aimVariance = 0.0; // Increased randomness for more misses
+		this.aimVariance = 0.15; // Small amount of randomness for slight variance
 		this.aimUpdateInterval = 0.5;
 		this.timeSinceLastAimUpdate = 0;
 		this.currentAimPoint = new THREE.Vector3();
 		this.targetAimPoint = new THREE.Vector3();
 		this.aimSmoothingFactor = 0.05; // Lower = smoother but slower (0-1)
 
-		// Targeting behavior
-		this.missChance = 0.0; // 33% chance to miss
-		this.forwardBias = 0.5; // How much to favor forward direction
+		// Targeting behavior with weighted hitbox preferences
+		this.hitboxWeights = {
+			head: 0.6, // 60% chance to target head
+			neck: 0.1, // 10% chance
+			shoulderl: 0.05,
+			shoulderr: 0.05,
+			spine: 0.05,
+			legl: 0.05,
+			legr: 0.05,
+			arml: 0.025,
+			armr: 0.025,
+		};
+
+		// Forward orientation check
+		this.passedTarget = false;
 
 		// Preview raycasting for highlighting
 		this.previewRayLine = null;
@@ -60,6 +72,22 @@ export class AILanceEntity extends LanceEntity {
 		this.scene.add(this.previewTipSphere);
 	}
 
+	// Helper method to select a hitbox based on weighted probabilities
+	selectWeightedHitbox() {
+		const random = Math.random();
+		let cumulativeProbability = 0;
+
+		for (const [hitbox, probability] of Object.entries(this.hitboxWeights)) {
+			cumulativeProbability += probability;
+			if (random < cumulativeProbability) {
+				return hitbox;
+			}
+		}
+
+		// Default to head if somehow we didn't select one
+		return 'head';
+	}
+
 	updateAiming(deltaTime) {
 		// Update aim point periodically
 		this.timeSinceLastAimUpdate += deltaTime;
@@ -81,9 +109,31 @@ export class AILanceEntity extends LanceEntity {
 			.add(offset.clone().applyQuaternion(this.handRef.getWorldQuaternion(new THREE.Quaternion())));
 
 		// Calculate direction from hand to aim point
-		const rayDirection = new THREE.Vector3()
+		let rayDirection = new THREE.Vector3()
 			.subVectors(this.currentAimPoint, handWorldPos)
 			.normalize();
+
+		// Only fix orientation AFTER passing the target, allowing full movement before passing
+		if (this.passedTarget) {
+			// Get the forward direction of the knight
+			const knightForward = this.ownerEntity.flipped
+				? new THREE.Vector3(1, 0, 0)
+				: new THREE.Vector3(-1, 0, 0);
+
+			// ONLY force forward orientation if we're truly past and tried to point backwards
+			// This allows the lance to still move freely horizontally unless it's trying to
+			// point backwards after passing
+			const dotWithForward = rayDirection.dot(knightForward);
+			if (dotWithForward < -0.2) {
+				// Only correct when significantly pointing backward
+				// Create a new direction that's mostly forward but preserves some of the original y-component
+				// to allow for continued vertical aiming
+				const originalY = rayDirection.y;
+				rayDirection.copy(knightForward);
+				rayDirection.y = originalY * 0.5; // Preserve some of the vertical aim
+				rayDirection.normalize();
+			}
+		}
 
 		// Set up raycasters
 		this.raycaster.set(handWorldPos, rayDirection);
@@ -237,25 +287,30 @@ export class AILanceEntity extends LanceEntity {
 		// Calculate vector from knight to player
 		const toPlayer = new THREE.Vector3().subVectors(playerPosition, knightPosition);
 
+		// Check if we've passed the target - using a more reliable method:
+		// Compare the sign of x-positions (assuming a horizontal jousting setup)
+		// and the knight's orientation to determine if they've passed
+		if (this.ownerEntity.flipped) {
+			// Knight faces right (+X)
+			this.passedTarget = knightPosition.x > playerPosition.x;
+		} else {
+			// Knight faces left (-X)
+			this.passedTarget = knightPosition.x < playerPosition.x;
+		}
+
 		// Set target position
 		const targetPosition = new THREE.Vector3();
 
-		// Get hitboxes from the target entity if the method exists
-		if (this.targetEntity.getHitbox('head')) {
-			// ALWAYS TARGET HEAD HITBOX - no randomness
-			const headHitbox = this.targetEntity.getHitbox('shoulderl');
-
-			// Force target selection - no random chance based targeting
-			let hitTarget = null;
-
-			if (headHitbox) hitTarget = headHitbox;
+		// Select a hitbox using weighted random selection
+		if (this.targetEntity.getHitbox) {
+			// Choose a hitbox based on weighted probabilities
+			const hitboxToTarget = this.selectWeightedHitbox();
+			const hitTarget = this.targetEntity.getHitbox(hitboxToTarget);
 
 			if (hitTarget) {
 				// Get the world position of the selected hitbox
 				hitTarget.getWorldPosition(targetPosition);
-				// targetPosition.add(new THREE.Vector3(0, 0.5, 0));
-				// console.log(targetPosition);
-				// console.log(`AI perfectly targeting: ${hitTarget.name}`);
+				// console.log(`AI targeting: ${hitboxToTarget}`);
 			} else {
 				// If somehow no hitbox was found, target player position
 				targetPosition.copy(playerPosition);
@@ -267,15 +322,16 @@ export class AILanceEntity extends LanceEntity {
 			targetPosition.y += 0.5; // Aim at upper body height
 		}
 
-		// NO VARIANCE - completely removing this section that adds random offsets
-		// DO NOT add any minimum variance or random offsets here
+		// Add slight variance to aim point
+		if (this.aimVariance > 0) {
+			const variance = this.aimVariance;
+			targetPosition.x += (Math.random() * 2 - 1) * variance;
+			targetPosition.y += (Math.random() * 2 - 1) * variance;
+			targetPosition.z += (Math.random() * 2 - 1) * variance;
+		}
 
 		// Store as target aim point
 		this.targetAimPoint.copy(targetPosition);
-
-		// For perfect accuracy, also set current aim point to target
-		// This bypasses the lerp smoothing in updateAiming
-		this.currentAimPoint.copy(targetPosition);
 	}
 
 	checkCollisions() {
@@ -290,14 +346,20 @@ export class AILanceEntity extends LanceEntity {
 		// Ensure ray direction is set
 		const rayDirection = this.raycaster.ray.direction.clone();
 
-		// Get target hitbox ONLY (e.g., "shoulderl" or "head")
-		const hitbox = this.targetEntity?.getHitbox('legl'); // Change string as needed
+		// Create a list of all potential hitboxes
+		const hitboxes = [];
+		for (const hitbox in this.hitboxWeights) {
+			const targetHitbox = this.targetEntity?.getHitbox(hitbox);
+			if (targetHitbox) {
+				hitboxes.push(targetHitbox);
+			}
+		}
 
-		if (!hitbox) return;
+		if (hitboxes.length === 0) return;
 
-		// Ensure ray intersects only that hitbox
+		// Ensure ray intersects with any hitbox
 		this.raycaster.far = 2.5;
-		const intersects = this.raycaster.intersectObject(hitbox, true);
+		const intersects = this.raycaster.intersectObjects(hitboxes, true);
 
 		if (intersects.length === 0) return;
 
@@ -352,6 +414,7 @@ export class AILanceEntity extends LanceEntity {
 		this.timeSinceLastAimUpdate = 0;
 		this.currentAimPoint = new THREE.Vector3();
 		this.targetAimPoint = new THREE.Vector3();
+		this.passedTarget = false;
 
 		// Reset preview ray visualization elements
 		if (this.previewRayLine) {

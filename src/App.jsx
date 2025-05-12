@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import gameStateManager from './GameStateManager';
 import game from './core/Game';
 import UILayout from './ui/UILayout';
-import HomePage from './ui/HomePage';
 
 function App() {
 	const [playerMPH, setPlayerMPH] = useState(0);
@@ -83,7 +82,7 @@ function App() {
 
 	return (
 		<>
-			{/* <div className='game-container'>
+			<div className='game-container'>
 				<div
 					ref={containerRef}
 					className='canvas-container'
@@ -97,8 +96,8 @@ function App() {
 						outline: 'none',
 					}}></div>
 			</div>
-			<UILayout /> */}
-			<HomePage />
+			<UILayout />
+			{/* <HomePage /> */}
 		</>
 	);
 }

@@ -12,7 +12,7 @@ const GameState = (() => {
 	let game_start_time = null;
 	let started_game_end_sequence = false;
 
-	const MAX_BOUTS = 1;
+	const MAX_BOUTS = 5;
 
 	let knights = {
 		player: null,
@@ -21,8 +21,8 @@ const GameState = (() => {
 
 	let movementOptions = {
 		moveSpeed: 7, // 7
-		nearHalfwayDistance: 12, // how far distance you need to trigger zoom
-		timeSlowdownFactor: 0.4, // Time slows to 40% during close pass
+		nearHalfwayDistance: 10, // how far distance you need to trigger zoom
+		timeSlowdownFactor: 0.3, // Time slows to 40% during close pass
 		horseWalkSpeed: 0.5, // Used for walking phase
 		startPosX: {
 			left: 20,

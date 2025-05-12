@@ -50,10 +50,10 @@ function GameMenu({ modalID, winner }) {
 		}, 100);
 	};
 
-	const exitToHome = () => {
-		// Logic to exit to home
-		handleClose();
-	};
+	// const exitToHome = () => {
+	// 	// Logic to exit to home
+	// 	handleClose();
+	// };
 
 	const handleClose = () => {
 		if (modalID && typeof modalID === 'function') {
@@ -90,12 +90,16 @@ function GameMenu({ modalID, winner }) {
 				</div>
 			</div>
 
-			<div className='h-full w-full flex flex-col justify-end items-end'>
+			<div className='h-full w-full flex flex-col justify-center items-end'>
 				{winner ? (
 					<button
 						onClick={startNewGame}
 						className='px-4 py-2 cursor-pointer hover:bg-black/10 h-fit w-full'>
-						<p className='text-xl font-medieval font-extrabold'>New Game</p>
+						<p className='text-xs font-medieval font-extrabold'>start</p>
+						<TextBold
+							text={`New Game`}
+							className={`text-3xl`}
+						/>
 					</button>
 				) : (
 					<button
@@ -104,11 +108,11 @@ function GameMenu({ modalID, winner }) {
 						<p className='text-xl font-medieval font-extrabold'>Resume Game</p>
 					</button>
 				)}
-				<button
+				{/* <button
 					onClick={exitToHome}
 					className='px-4 py-2 cursor-pointer hover:bg-black/10 h-fit w-full'>
 					<p className='text-xl font-medieval font-extrabold'>Exit to Home</p>
-				</button>
+				</button> */}
 			</div>
 		</div>
 	);
